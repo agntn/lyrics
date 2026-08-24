@@ -108,6 +108,17 @@ describe("musixmatch provider", () => {
     expect(lyrics.plain).toBe(FAKE_PLAIN);
   });
 
+  it("scans a body of blank lines without stalling", async () => {
+    vi.stubEnv("MUSIXMATCH_API_KEY", "key");
+    stubJSON(envelope(200, { lyrics: { lyrics_body: `\n${" \n".repeat(20_000)}x` } }));
+
+    const started = performance.now();
+    const lyrics = await create("musixmatch").lyrics({ artist: "a", track: "b" });
+
+    expect(performance.now() - started).toBeLessThan(200);
+    expect(lyrics.partial).toBe(false);
+  });
+
   it("leaves a complete lyric unflagged", async () => {
     vi.stubEnv("MUSIXMATCH_API_KEY", "key");
     stubJSON(envelope(200, LYRICS_BODY));

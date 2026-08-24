@@ -78,7 +78,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 
 ## Testing
 
-`pnpm test` (vitest, 16 files / 175 tests, all mocked via `vi.stubGlobal("fetch", ...)`).
+`pnpm test` (vitest, 16 files / 193 tests, all mocked via `vi.stubGlobal("fetch", ...)`).
 
 Packed-layout gate (manual): `pnpm pack`, install the tarball with `npm install --legacy-peer-deps` in an empty dir, register a custom provider through the main entry and confirm `lyrics_providers` from `@agntn/lyrics/mcp` lists it - this catches registry chunk splits, missing deps and broken `files`.
 

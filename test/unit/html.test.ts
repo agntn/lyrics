@@ -58,6 +58,14 @@ describe("requireLyrics", () => {
 });
 
 describe("slugify", () => {
+  it.each(["(", "[", "+", ".", "|"])("accepts %s as a separator instead of throwing", (sep) => {
+    expect(slugify("Test  Value", sep)).toBe(`test${sep}value`);
+  });
+
+  it("trims a multi-character separator from both ends", () => {
+    expect(slugify(" Test Value ", "--")).toBe("test--value");
+  });
+
   it.each([
     ["Radiohead", "", "radiohead"],
     ["Guns N' Roses", "", "gunsnroses"],

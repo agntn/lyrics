@@ -35,8 +35,28 @@ import { clampMaxResults } from "../core/types.ts";
 const MAX_RESULTS = 20;
 const DEFAULT_BASE_URL = "https://api.musixmatch.com/ws/1.1";
 
-/** The banner the free plan appends after the excerpt it is willing to serve. */
-const EXCERPT_BANNER = /\n\s*(?:\.{3}\s*\n\s*)?\*{3,}[\s\S]*$/;
+/**
+ * Line of asterisks the free plan appends after the excerpt it is willing to serve.
+ *
+ * Anchored per line rather than written as one pattern spanning the gap before it: a single
+ * pattern needs `\s*` between the newline and the asterisks, `\s` also matches a newline, and
+ * lyrics made of blank lines then cost the engine a retry from every position (20k blank lines
+ * measured 474 ms). Searching for the banner line itself is unambiguous and linear.
+ */
+const EXCERPT_BANNER = /^[^\S\n]*\*{3,}/m;
+
+/** Ellipsis line marking where the text was cut; it belongs to the banner, not to the song. */
+const EXCERPT_ELLIPSIS = /\n[^\S\n]*\.{3}$/;
+
+/** Split a served body into the text proper and whether it was an excerpt. */
+function cutExcerptBanner(body: string): { text: string; partial: boolean } {
+  const bannerAt = body.search(EXCERPT_BANNER);
+  if (bannerAt === -1) return { text: body, partial: false };
+  return {
+    text: body.slice(0, bannerAt).replace(/\s+$/, "").replace(EXCERPT_ELLIPSIS, ""),
+    partial: true,
+  };
+}
 
 interface MusixmatchEnvelope<T> {
   message?: {
@@ -190,16 +210,16 @@ class Musixmatch extends Provider {
     if (!rawBody.trim()) {
       throw new NotFoundError(resource, Musixmatch.key);
     }
-    const partial = EXCERPT_BANNER.test(rawBody);
+    const excerpt = cutExcerptBanner(rawBody);
     return {
       provider: Musixmatch.key,
       artist: query.artist,
       track: query.track,
       album: query.album,
       duration: query.duration,
-      plain: normalizeLyrics(rawBody.replace(EXCERPT_BANNER, "")),
+      plain: normalizeLyrics(excerpt.text),
       instrumental: false,
-      partial,
+      partial: excerpt.partial,
       attribution: lyrics?.lyrics_copyright?.trim() || undefined,
       raw: lyrics as unknown as Record<string, unknown> | undefined,
     };
