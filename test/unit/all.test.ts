@@ -1,0 +1,137 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { lyricsAll, lyricsWithFallback, searchAll, serializeOutcomes } from "../../src/core/all.ts";
+import { NotFoundError, RateLimitError } from "../../src/core/errors.ts";
+import { Provider, requireOperation } from "../../src/core/provider.ts";
+import type { Lyrics, ProviderCapabilities, TrackQuery } from "../../src/core/types.ts";
+import { create, register } from "../../src/core/registry.ts";
+import { FAKE_PLAIN, stubJSON } from "../helpers.ts";
+import "../../src/providers/index.ts";
+
+/** Behaviour a scripted provider should show for one call. */
+type Behaviour = "hit" | "miss" | "rate-limit";
+
+/** Build a provider class whose registry key and outcome are fixed up front. */
+function scripted(key: string, behaviour: Behaviour) {
+  return class Scripted extends Provider {
+    static readonly key = key;
+
+    get capabilities(): ProviderCapabilities {
+      return { search: false, lyrics: true, synced: false, translation: false };
+    }
+
+    async lyrics(query: TrackQuery): Promise<Lyrics> {
+      if (behaviour === "miss") throw new NotFoundError(`${query.artist} - ${query.track}`, key);
+      if (behaviour === "rate-limit") throw new RateLimitError(key, 30);
+      return {
+        provider: key,
+        artist: query.artist,
+        track: query.track,
+        plain: FAKE_PLAIN,
+        instrumental: false,
+        partial: false,
+      };
+    }
+  };
+}
+
+const QUERY: TrackQuery = { artist: "Placeholder Artist", track: "Placeholder Song" };
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("lyricsWithFallback", () => {
+  it("returns the first provider that has the track", async () => {
+    register(scripted("miss-one", "miss"));
+    register(scripted("has-it", "hit"));
+
+    const result = await lyricsWithFallback(QUERY, ["miss-one", "has-it"]);
+
+    expect(result.provider).toBe("has-it");
+    expect(result.lyrics.plain).toBe(FAKE_PLAIN);
+  });
+
+  it("records why each earlier provider was passed over", async () => {
+    register(scripted("miss-one", "miss"));
+    register(scripted("has-it", "hit"));
+
+    const result = await lyricsWithFallback(QUERY, ["miss-one", "has-it"]);
+
+    expect(result.skipped).toEqual([
+      { provider: "miss-one", error: expect.stringContaining("Not found") },
+    ]);
+  });
+
+  it("stops on a failure that is not about this provider missing the song", async () => {
+    register(scripted("limited", "rate-limit"));
+    register(scripted("has-it", "hit"));
+
+    await expect(lyricsWithFallback(QUERY, ["limited", "has-it"])).rejects.toThrow(RateLimitError);
+  });
+
+  it("skips a provider that cannot serve lyrics at all", async () => {
+    register(scripted("has-it", "hit"));
+
+    const result = await lyricsWithFallback(QUERY, ["lyricsovh-like-missing", "has-it"]).catch(
+      (error: unknown) => error,
+    );
+
+    expect(result).toBeInstanceOf(Error);
+  });
+
+  it("throws the last failure when nobody has the track", async () => {
+    register(scripted("miss-one", "miss"));
+    register(scripted("miss-two", "miss"));
+
+    await expect(lyricsWithFallback(QUERY, ["miss-one", "miss-two"])).rejects.toThrow(
+      NotFoundError,
+    );
+  });
+
+  it("throws when handed an empty provider order", async () => {
+    await expect(lyricsWithFallback(QUERY, [])).rejects.toThrow(NotFoundError);
+  });
+});
+
+describe("lyricsAll", () => {
+  it("keeps failures beside results instead of hiding them", async () => {
+    stubJSON({ message: "Failed to find specified track" }, 404);
+
+    const outcomes = await lyricsAll(QUERY);
+    const byProvider = new Map(outcomes.map((outcome) => [outcome.provider, outcome]));
+
+    expect(byProvider.get("musixmatch")?.error?.message).toContain("MUSIXMATCH_API_KEY");
+    expect(outcomes.length).toBeGreaterThanOrEqual(6);
+  });
+});
+
+describe("searchAll", () => {
+  it("reports the capability gate for providers that cannot search", async () => {
+    stubJSON([]);
+
+    const outcomes = await searchAll("placeholder");
+    const lyricsovh = outcomes.find((outcome) => outcome.provider === "lyricsovh");
+
+    expect(lyricsovh?.error?.message).toContain('Operation "search" not supported');
+  });
+});
+
+describe("serializeOutcomes", () => {
+  it("reduces errors to their messages for JSON surfaces", () => {
+    const serialized = serializeOutcomes([
+      { provider: "lrclib", result: [1, 2] },
+      { provider: "genius", error: new NotFoundError("track", "genius") },
+    ]);
+
+    expect(serialized).toEqual([
+      { provider: "lrclib", result: [1, 2] },
+      { provider: "genius", error: "Not found: track" },
+    ]);
+  });
+});
+
+describe("registry isolation", () => {
+  it("leaves the built-in providers usable after scripted registrations", () => {
+    expect(() => requireOperation(create("lrclib"), "lyrics")).not.toThrow();
+  });
+});
