@@ -126,7 +126,6 @@ class Genius extends Provider {
       partial: false,
       url,
       attribution: "Lyrics hosted by Genius",
-      raw: song as unknown as Record<string, unknown> | undefined,
     };
   }
 

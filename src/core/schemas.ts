@@ -54,12 +54,6 @@ export const limitInput = z
   .optional()
   .describe("Max results; providers cap this at 10-20 and silently truncate");
 
-/** Ask for the synchronized (LRC) text instead of the plain one. */
-export const syncedInput = z
-  .boolean()
-  .optional()
-  .describe("Prefer synchronized LRC lyrics; providers without them fall back to plain text");
-
 /** Position in the recording, for reading a synced line at a moment. */
 export const secondsInput = z
   .number()

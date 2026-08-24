@@ -221,7 +221,6 @@ class Musixmatch extends Provider {
       instrumental: false,
       partial: excerpt.partial,
       attribution: lyrics?.lyrics_copyright?.trim() || undefined,
-      raw: lyrics as unknown as Record<string, unknown> | undefined,
     };
   }
 }

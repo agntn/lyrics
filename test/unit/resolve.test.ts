@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { UnknownProviderError } from "../../src/core/errors.ts";
-import { isConfigured, resolveProvider, selectProvider } from "../../src/core/resolve.ts";
+import {
+  isConfigured,
+  providerArg,
+  resolveProvider,
+  selectProvider,
+  usableProviders,
+} from "../../src/core/resolve.ts";
 import "../../src/providers/index.ts";
 
 afterEach(() => {
@@ -60,5 +66,34 @@ describe("selectProvider", () => {
 
   it("rejects an unknown explicit provider", () => {
     expect(() => selectProvider("missing")).toThrow(UnknownProviderError);
+  });
+});
+
+describe("usableProviders", () => {
+  it("lists providers per capability, not only per operation", () => {
+    expect(usableProviders("translation")).toEqual(["tekstowo"]);
+    expect(usableProviders("synced")).toEqual(["lrclib"]);
+    expect(usableProviders("search")).toEqual(["lrclib", "tekstowo"]);
+  });
+
+  it("admits a keyed provider once its variable is set", () => {
+    expect(usableProviders("search")).not.toContain("musixmatch");
+    vi.stubEnv("MUSIXMATCH_API_KEY", "key");
+    expect(usableProviders("search")).toContain("musixmatch");
+  });
+
+  it("keeps registration order", () => {
+    const lyrics = usableProviders("lyrics");
+    expect(lyrics.indexOf("lrclib")).toBeLessThan(lyrics.indexOf("tekstowo"));
+  });
+});
+
+describe("providerArg", () => {
+  it.each([undefined, "", "   ", "\t"])("treats %j as no preference", (value) => {
+    expect(providerArg(value)).toBeUndefined();
+  });
+
+  it("trims a named provider", () => {
+    expect(providerArg("  lrclib ")).toBe("lrclib");
   });
 });

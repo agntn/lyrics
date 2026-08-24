@@ -3,7 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { lyricsAll, lyricsWithFallback, searchAll, serializeOutcomes } from "./core/all.ts";
 import { requireOperation } from "./core/provider.ts";
 import { listProviders } from "./core/registry.ts";
-import { isAllProviders, selectProvider } from "./core/resolve.ts";
+import { isAllProviders, providerArg, selectProvider } from "./core/resolve.ts";
 import {
   albumInput,
   artistInput,
@@ -84,7 +84,7 @@ export function createMcpServer(): McpServer {
       if (isAllProviders(provider)) {
         return result(serializeOutcomes(await lyricsAll(query)));
       }
-      if (!provider) {
+      if (!providerArg(provider)) {
         const fallback = await lyricsWithFallback(query);
         return result({
           provider: fallback.provider,
@@ -110,8 +110,8 @@ export function createMcpServer(): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     ({ lrc, seconds }) => {
-      const line = lineAt(lrc, seconds);
-      return result({ seconds, line: line ?? null, totalLines: parseLrc(lrc).length });
+      const lines = parseLrc(lrc);
+      return result({ seconds, line: lineAt(lines, seconds) ?? null, totalLines: lines.length });
     },
   );
 

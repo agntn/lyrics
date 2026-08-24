@@ -9,8 +9,9 @@ import {
   formatTranslation,
 } from "../core/format.ts";
 import { requireOperation } from "../core/provider.ts";
-import { isAllProviders, selectProvider } from "../core/resolve.ts";
+import { isAllProviders, providerArg, selectProvider, usableProviders } from "../core/resolve.ts";
 import type { TrackQuery } from "../core/types.ts";
+import { parseNumericArg } from "./args.ts";
 
 export default defineCommand({
   meta: {
@@ -59,15 +60,7 @@ export default defineCommand({
   },
   async run({ args }) {
     try {
-      let duration: number | undefined;
-      if (args.duration !== undefined) {
-        duration = Number.parseFloat(args.duration);
-        if (!Number.isFinite(duration) || duration <= 0) {
-          consola.error(`Invalid duration: ${args.duration}`);
-          process.exit(1);
-        }
-      }
-
+      const duration = parseNumericArg(args.duration, "duration", { min: Number.EPSILON });
       const query: TrackQuery = {
         artist: args.artist,
         track: args.track,
@@ -81,8 +74,11 @@ export default defineCommand({
         return;
       }
 
-      if (!args.provider) {
-        const result = await lyricsWithFallback(query);
+      if (!providerArg(args.provider)) {
+        const result = await lyricsWithFallback(
+          query,
+          args.translation ? usableProviders("translation") : undefined,
+        );
         consola.log(
           args.translation
             ? formatTranslation(result.lyrics)

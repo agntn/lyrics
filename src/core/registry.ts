@@ -75,6 +75,17 @@ export function getEnvKey(name: string): string | undefined {
   return registry.get(name)?.providerClass.envKey;
 }
 
+/**
+ * True when the provider needs no credential, or has the one it needs.
+ *
+ * This lives with the registry because it is a fact about a registration, and `listProviders`
+ * would otherwise answer the same question with its own copy of the rule.
+ */
+export function isConfigured(name: string): boolean {
+  const envKey = getEnvKey(name);
+  return envKey === undefined || Boolean(process.env[envKey]);
+}
+
 /** True when the registered provider serves `operation`. */
 export function supportsOperation(name: string, operation: ProviderOperation): boolean {
   const entry = registry.get(name);
@@ -98,14 +109,11 @@ export interface ProviderListing {
 
 /** Enumerate registered providers with their capabilities and credential state. */
 export function listProviders(): ProviderListing[] {
-  return providers().map((name) => {
-    const envKey = getEnvKey(name);
-    return {
-      name,
-      defaultUrl: getDefaultURL(name),
-      capabilities: create(name).capabilities,
-      envKey,
-      configured: envKey ? Boolean(process.env[envKey]) : true,
-    };
-  });
+  return providers().map((name) => ({
+    name,
+    defaultUrl: getDefaultURL(name),
+    capabilities: create(name).capabilities,
+    envKey: getEnvKey(name),
+    configured: isConfigured(name),
+  }));
 }

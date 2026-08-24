@@ -1,8 +1,40 @@
 /** Auto-select a provider from the environment and the operation being requested */
 
-import { create, getEnvKey, has, providers, supportsOperation } from "./registry.ts";
+import { create, has, isConfigured, providers, supportsOperation } from "./registry.ts";
 import { UnknownProviderError } from "./errors.ts";
 import type { Provider, ProviderOperation } from "./provider.ts";
+import type { ProviderCapabilities } from "./types.ts";
+
+export { isConfigured } from "./registry.ts";
+
+/**
+ * Normalize a caller-supplied provider argument.
+ *
+ * Empty and whitespace-only strings mean "no preference". Every surface asks this question, and
+ * each one that answered it inline drifted: a truthiness check treats `"  "` as a named provider
+ * and skips the fallback walk the caller expected.
+ */
+export function providerArg(value?: string): string | undefined {
+  return value?.trim() || undefined;
+}
+
+/**
+ * Registered providers that serve `capability` and are usable in this environment, in
+ * registration order.
+ *
+ * Selection needs this for the two operations, and the surfaces need it for the other two
+ * capabilities: asking for a translation is worth nothing if the walk stops at a provider that
+ * has none. One list, four capabilities, no per-surface copies.
+ */
+export function usableProviders(capability: keyof ProviderCapabilities): string[] {
+  return providers().filter(
+    (name) =>
+      isConfigured(name) &&
+      (capability === "search" || capability === "lyrics"
+        ? supportsOperation(name, capability)
+        : create(name).capabilities[capability]),
+  );
+}
 
 /**
  * Check for the reserved "all" provider value, which fans a request out to every registered
@@ -10,12 +42,6 @@ import type { Provider, ProviderOperation } from "./provider.ts";
  */
 export function isAllProviders(preferred?: string): boolean {
   return preferred?.trim().toLowerCase() === "all";
-}
-
-/** True when the provider needs no credential, or has the one it needs. */
-export function isConfigured(name: string): boolean {
-  const envKey = getEnvKey(name);
-  return envKey === undefined || Boolean(process.env[envKey]);
 }
 
 /**
@@ -43,10 +69,13 @@ export function resolveProvider(
     return preferred;
   }
 
-  const capable = providers().filter((name) => supportsOperation(name, operation));
-  const usable = capable.find((name) => isConfigured(name));
+  const [usable] = usableProviders(operation);
+  if (usable) return usable;
 
-  return usable ?? capable[0] ?? providers()[0] ?? "lrclib";
+  const [capable] = providers().filter((name) => supportsOperation(name, operation));
+  if (capable) return capable;
+
+  throw new UnknownProviderError(`no registered provider serves ${operation}`);
 }
 
 /** A provider instance paired with its registry key. */
@@ -68,7 +97,6 @@ export function selectProvider(
   preferred?: string,
   operation: ProviderOperation = "lyrics",
 ): SelectedProvider {
-  const preferredName = preferred?.trim() || undefined;
-  const name = resolveProvider(preferredName, operation);
+  const name = resolveProvider(providerArg(preferred), operation);
   return { name, provider: create(name) };
 }

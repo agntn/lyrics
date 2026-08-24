@@ -7,7 +7,7 @@ import type { SerializedOutcome } from "./core/all.ts";
 import { lyricsAll, lyricsWithFallback, searchAll, serializeOutcomes } from "./core/all.ts";
 import { requireOperation } from "./core/provider.ts";
 import { providers } from "./core/registry.ts";
-import { isAllProviders, selectProvider } from "./core/resolve.ts";
+import { isAllProviders, providerArg, selectProvider } from "./core/resolve.ts";
 import {
   albumInput,
   artistInput,
@@ -70,7 +70,7 @@ export const lyricsTool: Tool<z.infer<typeof lyricsInputSchema>, LyricsToolOutpu
     if (isAllProviders(provider)) {
       return { comparison: serializeOutcomes(await lyricsAll(query)) };
     }
-    if (!provider) {
+    if (!providerArg(provider)) {
       const fallback = await lyricsWithFallback(query);
       return { provider: fallback.provider, lyrics: fallback.lyrics, skipped: fallback.skipped };
     }
@@ -93,7 +93,8 @@ export const lineAtTool: Tool<
     "Read the line playing at a given second out of synchronized LRC lyrics, computed locally on text already fetched.",
   inputSchema: lineAtInputSchema,
   execute: async ({ lrc, seconds }) => {
-    return { seconds, line: lineAt(lrc, seconds) ?? null, totalLines: parseLrc(lrc).length };
+    const lines = parseLrc(lrc);
+    return { seconds, line: lineAt(lines, seconds) ?? null, totalLines: lines.length };
   },
 });
 

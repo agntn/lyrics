@@ -19,7 +19,7 @@ vi.mock("@oh-my-pi/pi-coding-agent/tui", () => ({
   renderStatusLine: (options: unknown) => JSON.stringify(options),
 }));
 
-import { FAKE_PLAIN, FAKE_SYNCED, requireTool, stubJSON } from "../helpers.ts";
+import { FAKE_PLAIN, FAKE_SYNCED, LRCLIB_TRACK, requireTool, stubJSON } from "../helpers.ts";
 import lyricsOmpExtension, { sanitizeTerminalText } from "../../packages/omp/extensions/lyrics.ts";
 
 interface RegisteredExtension {
@@ -53,15 +53,7 @@ function accepts(tool: ToolDefinition, value: unknown): boolean {
 /** SAFETY: the tested execute functions do not read ExtensionContext. */
 const unusedContext = {} as ExtensionContext;
 
-const TRACK = {
-  id: 496,
-  trackName: "Placeholder Song",
-  artistName: "Placeholder Artist",
-  duration: 239,
-  instrumental: false,
-  plainLyrics: FAKE_PLAIN,
-  syncedLyrics: FAKE_SYNCED,
-};
+const TRACK = LRCLIB_TRACK;
 
 afterEach(() => {
   vi.unstubAllGlobals();

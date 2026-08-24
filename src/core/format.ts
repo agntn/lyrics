@@ -3,7 +3,7 @@
 import type { FallbackResult, ProviderOutcome } from "./all.ts";
 import type { ProviderListing } from "./registry.ts";
 import { formatDuration } from "./text.ts";
-import type { Lyrics, TrackMatch, TrackQuery } from "./types.ts";
+import type { Lyrics, TrackMatch } from "./types.ts";
 
 /** One-line label for a track in a list of matches. */
 export function formatTrackLine(match: TrackMatch): string {
@@ -105,11 +105,6 @@ export function formatFallback(result: FallbackResult, options?: { synced?: bool
   return [...skipped, skipped.length > 0 ? "" : null, formatLyrics(result.lyrics, options)]
     .filter((line) => line !== null)
     .join("\n");
-}
-
-/** Label describing a track query, for messages about a lookup that found nothing. */
-export function formatTrackQuery(query: TrackQuery): string {
-  return `${query.artist} - ${query.track}`;
 }
 
 /** Multi-line listing of registered providers and what each can serve. */

@@ -41,7 +41,14 @@ export {
   supportsOperation,
 } from "./core/registry.ts";
 export type { ProviderListing } from "./core/registry.ts";
-export { isAllProviders, isConfigured, resolveProvider, selectProvider } from "./core/resolve.ts";
+export {
+  isAllProviders,
+  isConfigured,
+  providerArg,
+  resolveProvider,
+  selectProvider,
+  usableProviders,
+} from "./core/resolve.ts";
 export type { SelectedProvider } from "./core/resolve.ts";
 export { lyricsAll, lyricsWithFallback, searchAll, serializeOutcomes } from "./core/all.ts";
 export type { FallbackResult, ProviderOutcome, SerializedOutcome } from "./core/all.ts";
@@ -53,7 +60,6 @@ export {
   formatProviders,
   formatSearchAll,
   formatTrackLine,
-  formatTrackQuery,
   formatTracks,
   formatTranslation,
 } from "./core/format.ts";

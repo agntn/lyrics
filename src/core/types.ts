@@ -46,8 +46,6 @@ export interface Lyrics {
   url?: string;
   /** Attribution or copyright line the provider asks callers to show */
   attribution?: string;
-  /** Raw provider data */
-  raw?: Record<string, unknown>;
 }
 
 /**

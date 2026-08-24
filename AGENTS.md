@@ -34,6 +34,8 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 - `lyrics` is abstract on `Provider`, `search` is an optional method - a provider that cannot search simply does not implement it, and `requireOperation()` checks the capability flag _and_ the method before returning it bound
 - Provider construction never checks credentials. That keeps `create()` total, so `listProviders()` and `supportsOperation()` can answer for keyed providers too; a missing key surfaces as `AuthError` naming the variable when an operation needs it
 - Credentials are declared as `static readonly envKey` on the provider class, not in a map in `resolve.ts`. Auto-selection reads it off the registry, so an externally registered provider participates on the same terms as a built-in one
+- `usableProviders(capability)` in `core/resolve.ts` is the one list of providers that serve a capability and are usable now. It answers for all four capabilities, not just the two operations: `--translation` without a named provider walks only providers that have translations, which is the difference between reaching tekstowo and stopping at lrclib with nothing to show
+- `providerArg()` normalizes a caller-supplied provider argument in one place. Every surface that answered "did the caller name a provider" with its own truthiness check drifted: `"  "` counted as a named provider on one surface and as absent on another
 - Auto-selection is **registration order among usable candidates**, deliberately _not_ "configured keys first" as in `@agntn/maps`: a Musixmatch key buys an excerpt where keyless LRCLIB returns the whole song, so promoting a keyed provider would degrade the result. Registration order in `src/providers/index.ts` is therefore the fallback order and is load-bearing
 - `lyricsWithFallback()` walks providers on `NotFoundError`, `AuthError`, `PaymentError`, `UnsupportedOperationError` and `ParseError` - "this one does not have it" - and rethrows anything else (rate limits, transport failures), because retrying those elsewhere hides a real problem
 - HTML providers go through `core/html.ts`: `parseHtml()` substitutes `<br>` with a newline _before_ parsing (that is what preserves line structure; `.text` then decodes entities), and `requireLyrics()` raises `ParseError` when a selector matches nothing. Selectors live at the top of each provider file
@@ -55,13 +57,15 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 - `src/core/html.ts` - `parseHtml`, `selectLyrics`, `requireLyrics`, `slugify` - everything the scraping providers share
 - `src/core/errors.ts` - error hierarchy + `normalizeError` + URL sanitization
 - `src/core/registry.ts` - self-registering registry (register, create, providers, has, getEnvKey, supportsOperation, listProviders)
-- `src/core/resolve.ts` - operation-aware auto-selection, `isConfigured`, `selectProvider`, `isAllProviders`
+- `src/core/resolve.ts` - capability-aware selection: `usableProviders`, `providerArg`, `selectProvider`, `isAllProviders`; `isConfigured` lives in the registry and is re-exported here
+- `src/commands/args.ts` - `parseNumericArg`, because citty has no numeric argument type and four commands were each validating their own
 - `src/core/all.ts` - `searchAll`, `lyricsAll`, `lyricsWithFallback`, `serializeOutcomes`
 - `src/core/format.ts` - plain-text formatters shared by every output surface
 - `src/core/schemas.ts` - zod input fragments shared by the MCP server and the AI tools
 - `src/core/client.ts` - ofetch wrapper: `getJSON`, `getText` (HTML), 15 s timeout, no retry, identifying User-Agent
 - `src/providers/*.ts` - one file per provider, self-registering via `register()`; order in `index.ts` is the fallback order
 - `src/mcp.ts` - `createMcpServer()`, four read-only tools (`lyrics_line_at` is local)
+- `src/commands/mcp.ts` - imports the SDK inside `run()`, not at module scope: citty resolves every lazy subcommand to read its `meta`, so a top-level import puts the MCP SDK into the startup path of `lyrics --help` and every other command
 - `src/ai.ts` - Vercel AI SDK tool surface
 - `src/cli.ts` + `src/commands/*.ts` - citty CLI with lazy subcommands
 - `packages/pi/extensions/lyrics.ts`, `packages/omp/extensions/lyrics.ts` - agent extensions; type-import from `dist/index.d.mts`. The OMP loader keeps both dynamic imports literal: `existsSync(src)` chooses `import("../../../src/index.ts")` or `import("../../../dist/index.mjs")`. An `import(url.href)` loses `ofetch` resolution in the compiled binary
@@ -71,6 +75,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 - **Lyrics are copyrighted.** Results carry `url` and `attribution` and every text surface prints them; the extensions tell the model to quote the shortest excerpt needed. No fixture in this repository contains real lyrics - `test/helpers.ts` exports invented placeholder lines, and new tests must use them rather than sampling a real song
 - The three HTML providers depend on site layout. A selector change surfaces as `ParseError` with the page URL; fix the selector in the provider file and re-verify live before believing a test fixture
 - Their terms of service restrict automated access. That is an operator decision, documented in the README, not something the library asserts a right to
+- `Lyrics` carries no `raw` field. Providers keep their payload in `TrackMatch.raw` where it has a reader; on `Lyrics` nothing read it while every MCP and AI result serialized it, which tripled the response and put the whole song in the model's context twice
 - Musixmatch free plan returns an excerpt closed by a `*******` banner; the provider cuts the banner and sets `partial: true`. Do not strip the flag to make output look complete
 - Genius without a token derives the page URL from artist and title, which misses for songs whose Genius spelling differs. With a token the URL comes from the API. An `id` without a token raises `AuthError` rather than being silently ignored
 - LRCLIB `/api/search` returns community records of uneven quality: some rows repeat the artist inside `trackName` ("Radiohead - Creep" as the title). That is the data, not the mapping - `/api/get` is the accurate path once artist and title are known
@@ -78,7 +83,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 
 ## Testing
 
-`pnpm test` (vitest, 16 files / 193 tests, all mocked via `vi.stubGlobal("fetch", ...)`).
+`pnpm test` (vitest, 16 files / 203 tests, all mocked via `vi.stubGlobal("fetch", ...)`).
 
 Packed-layout gate (manual): `pnpm pack`, install the tarball with `npm install --legacy-peer-deps` in an empty dir, register a custom provider through the main entry and confirm `lyrics_providers` from `@agntn/lyrics/mcp` lists it - this catches registry chunk splits, missing deps and broken `files`.
 

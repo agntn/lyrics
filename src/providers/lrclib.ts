@@ -94,7 +94,6 @@ class Lrclib extends Provider {
       instrumental: track.instrumental === true,
       partial: false,
       url: `${this.baseUrl}/api/get/${track.id}`,
-      raw: track as unknown as Record<string, unknown>,
     };
   }
 }

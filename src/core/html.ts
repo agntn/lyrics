@@ -76,34 +76,18 @@ const UNDECOMPOSED_LETTERS: Record<string, string> = {
 };
 
 /**
- * Escape a literal so it can stand inside a regular expression.
- *
- * `slugify` is exported, so its separator is caller-controlled: interpolating `(` or `+` raw
- * builds an invalid pattern and throws `SyntaxError`, which is outside the error hierarchy every
- * caller catches.
- */
-function escapeForRegExp(literal: string): string {
-  return literal.replace(/[$()*+.?[\\\]^{|}]/g, (character) => `\\${character}`);
-}
-
-/**
  * Turn free text into a URL path segment the lyrics sites accept.
  *
  * Diacritics fold onto ASCII, everything that is not a letter or digit is dropped, and the
  * result is lowercased - the shape AZLyrics uses for its `/lyrics/<artist>/<title>.html` paths.
  */
 export function slugify(value: string, separator = ""): string {
-  return value
+  const words = value
     .toLowerCase()
     .replace(/[łøđħŧæœß]/g, (letter) => UNDECOMPOSED_LETTERS[letter] ?? letter)
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, separator)
-    .replace(
-      separator
-        ? new RegExp(`^(?:${escapeForRegExp(separator)})+|(?:${escapeForRegExp(separator)})+$`, "g")
-        : /^$/,
-      "",
-    );
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word !== "");
+  return words.join(separator);
 }

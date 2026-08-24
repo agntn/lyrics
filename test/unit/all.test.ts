@@ -4,7 +4,8 @@ import { NotFoundError, RateLimitError } from "../../src/core/errors.ts";
 import { Provider, requireOperation } from "../../src/core/provider.ts";
 import type { Lyrics, ProviderCapabilities, TrackQuery } from "../../src/core/types.ts";
 import { create, register } from "../../src/core/registry.ts";
-import { FAKE_PLAIN, stubJSON } from "../helpers.ts";
+import { FAKE_PLAIN, stubHTML, stubJSON } from "../helpers.ts";
+import { usableProviders } from "../../src/core/resolve.ts";
 import "../../src/providers/index.ts";
 
 /** Behaviour a scripted provider should show for one call. */
@@ -90,6 +91,30 @@ describe("lyricsWithFallback", () => {
 
   it("throws when handed an empty provider order", async () => {
     await expect(lyricsWithFallback(QUERY, [])).rejects.toThrow(NotFoundError);
+  });
+});
+
+describe("capability-scoped fallback", () => {
+  it("walks only the providers that serve the wanted capability", async () => {
+    const order = usableProviders("translation");
+    stubHTML(`<html><body><h1>A - B</h1>
+      <div id="songText"><div class="inner-text">Original line</div></div>
+      <div id="translation"><div class="inner-text">Translated line</div></div></body></html>`);
+
+    const result = await lyricsWithFallback(QUERY, order);
+
+    expect(order).toEqual(["tekstowo"]);
+    expect(result.provider).toBe("tekstowo");
+    expect(result.lyrics.translation).toBe("Translated line");
+  });
+
+  it("would otherwise stop at a provider that has no translation at all", async () => {
+    stubJSON({ id: 1, trackName: "b", artistName: "a", plainLyrics: FAKE_PLAIN });
+
+    const unscoped = await lyricsWithFallback(QUERY);
+
+    expect(unscoped.provider).toBe("lrclib");
+    expect(unscoped.lyrics.translation).toBeUndefined();
   });
 });
 

@@ -12,6 +12,17 @@ export const FAKE_PLAIN = "First placeholder line\nSecond placeholder line\nThir
 export const FAKE_SYNCED =
   "[00:10.00] First placeholder line\n[00:20.50] Second placeholder line\n[01:00.00] Third placeholder line";
 
+/** LRCLIB record shape, as `/api/get` returns it, with placeholder text. */
+export const LRCLIB_TRACK = {
+  id: 496,
+  trackName: "Placeholder Song",
+  artistName: "Placeholder Artist",
+  duration: 239,
+  instrumental: false,
+  plainLyrics: FAKE_PLAIN,
+  syncedLyrics: FAKE_SYNCED,
+};
+
 /** Look up a registered extension tool, failing loudly when registration missed it. */
 export function requireTool<T>(tools: Map<string, T>, name: string): T {
   const tool = tools.get(name);
@@ -21,28 +32,12 @@ export function requireTool<T>(tools: Map<string, T>, name: string): T {
 
 /** Stub global fetch with one JSON body; returns the mock for call inspection. */
 export function stubJSON(body: unknown, status = 200) {
-  const fetch = vi.fn(
-    async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      new Response(JSON.stringify(body), {
-        status,
-        headers: { "Content-Type": "application/json" },
-      }),
-  );
-  vi.stubGlobal("fetch", fetch);
-  return fetch;
+  return stubRoutes({ "": { body, status } });
 }
 
 /** Stub global fetch with one HTML body; returns the mock for call inspection. */
 export function stubHTML(body: string, status = 200) {
-  const fetch = vi.fn(
-    async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      new Response(body, {
-        status,
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      }),
-  );
-  vi.stubGlobal("fetch", fetch);
-  return fetch;
+  return stubRoutes({ "": { body, status, html: true } });
 }
 
 /** Stub global fetch with a per-URL body map; unmatched URLs answer 404. */

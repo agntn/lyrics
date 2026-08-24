@@ -162,7 +162,7 @@ export default function lyricsExtension(pi: ExtensionAPI): void {
       if (lib.isAllProviders(params.provider)) {
         return textResult(lib.formatLyricsAll(await lib.lyricsAll(query)));
       }
-      if (params.provider?.trim()) {
+      if (lib.providerArg(params.provider)) {
         const { provider } = lib.selectProvider(params.provider);
         const lyrics = await lib.requireOperation(provider, "lyrics")(query);
         return textResult(
@@ -248,11 +248,8 @@ export default function lyricsExtension(pi: ExtensionAPI): void {
     async execute(_toolCallId, params): Promise<LyricsToolResult> {
       const lib = await loadLibrary();
       const query = { artist: params.artist, track: params.track, duration: params.duration };
-      const syncedProviders = lib
-        .listProviders()
-        .filter((listing) => listing.capabilities.synced && listing.configured)
-        .map((listing) => listing.name);
-      const lyrics = params.provider?.trim()
+      const syncedProviders = lib.usableProviders("synced");
+      const lyrics = lib.providerArg(params.provider)
         ? await lib.requireOperation(lib.selectProvider(params.provider).provider, "lyrics")(query)
         : (await lib.lyricsWithFallback(query, syncedProviders)).lyrics;
 

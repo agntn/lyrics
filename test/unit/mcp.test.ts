@@ -6,7 +6,7 @@ import type { ProviderConstructor } from "../../src/core/provider.ts";
 import { create, getDefaultURL, register } from "../../src/core/registry.ts";
 import type { ProviderCapabilities } from "../../src/core/types.ts";
 import { createMcpServer } from "../../src/mcp.ts";
-import { FAKE_PLAIN, FAKE_SYNCED, stubJSON } from "../helpers.ts";
+import { FAKE_PLAIN, FAKE_SYNCED, LRCLIB_TRACK, stubJSON } from "../helpers.ts";
 
 const openConnections: Array<{ close(): Promise<void> }> = [];
 
@@ -14,15 +14,7 @@ const openConnections: Array<{ close(): Promise<void> }> = [];
 const lrclibConstructor = create("lrclib").constructor as ProviderConstructor;
 const lrclibDefaultURL = getDefaultURL("lrclib");
 
-const TRACK = {
-  id: 496,
-  trackName: "Placeholder Song",
-  artistName: "Placeholder Artist",
-  duration: 239,
-  instrumental: false,
-  plainLyrics: FAKE_PLAIN,
-  syncedLyrics: FAKE_SYNCED,
-};
+const TRACK = LRCLIB_TRACK;
 
 afterEach(async () => {
   register(lrclibConstructor, lrclibDefaultURL);

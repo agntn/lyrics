@@ -62,28 +62,34 @@ export function parseLrc(synced: string): SyncedLine[] {
   return lines.sort((a, b) => a.time - b.time);
 }
 
-/** Strip the timestamps from LRC-formatted lyrics, leaving the plain text. */
+/**
+ * Strip the timestamps from LRC-formatted lyrics, leaving the plain text.
+ *
+ * `parseLrc` already normalized the input, so the join only needs the blank-line collapse that
+ * dropping timestamps can expose, not another full normalization pass.
+ */
 export function lrcToPlain(synced: string): string {
-  return normalizeLyrics(
-    parseLrc(synced)
-      .map((line) => line.text)
-      .join("\n"),
-  );
+  return parseLrc(synced)
+    .map((line) => line.text)
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /**
  * Return the line being sung at `seconds`, or `undefined` before the first timestamp.
  *
- * Runs locally on already-fetched lyrics - no provider involved.
+ * Runs locally on already-fetched lyrics - no provider involved. Accepts already-parsed lines so
+ * a caller that also needs the line count does not pay for parsing the same LRC twice.
  *
  * @throws {InvalidInputError} When `seconds` is not a finite, non-negative number.
  */
-export function lineAt(synced: string, seconds: number): SyncedLine | undefined {
+export function lineAt(synced: string | SyncedLine[], seconds: number): SyncedLine | undefined {
   if (!Number.isFinite(seconds) || seconds < 0) {
     throw new InvalidInputError(`seconds must be a non-negative number, got ${seconds}`);
   }
   let current: SyncedLine | undefined;
-  for (const line of parseLrc(synced)) {
+  for (const line of typeof synced === "string" ? parseLrc(synced) : synced) {
     if (line.time > seconds) break;
     current = line;
   }

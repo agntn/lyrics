@@ -5,6 +5,7 @@ import { searchAll } from "../core/all.ts";
 import { formatSearchAll, formatTracks } from "../core/format.ts";
 import { requireOperation } from "../core/provider.ts";
 import { isAllProviders, selectProvider } from "../core/resolve.ts";
+import { parseNumericArg } from "./args.ts";
 
 export default defineCommand({
   meta: {
@@ -30,14 +31,7 @@ export default defineCommand({
   },
   async run({ args }) {
     try {
-      let limit: number | undefined;
-      if (args.limit !== undefined) {
-        limit = Number.parseInt(args.limit, 10);
-        if (Number.isNaN(limit) || limit < 1) {
-          consola.error(`Invalid limit: ${args.limit}`);
-          process.exit(1);
-        }
-      }
+      const limit = parseNumericArg(args.limit, "limit", { integer: true, min: 1 });
 
       if (isAllProviders(args.provider)) {
         consola.log(formatSearchAll(args.query, await searchAll(args.query, { limit })));
