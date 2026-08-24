@@ -2,7 +2,7 @@
 
 Six lyrics sites, one shape.
 
-Every lyrics service answers the same two questions - "which song is this?" and "what are the words?" - in its own format, and none of them has every song. Lyrics normalizes six backends behind one TypeScript API and one CLI, and when a provider does not have the track it moves on to the next one instead of handing you an error.
+No single site has every song, and the API you would reach for first, Genius, serves everything about a track except its actual words. So a lookup that works in practice means trying several backends and knowing what each one will refuse. That is this library: six providers behind one TypeScript API and one CLI, walked in order until one has the track.
 
 ## Features
 
@@ -11,10 +11,10 @@ Every lyrics service answers the same two questions - "which song is this?" and 
 - **Falls through misses.** No single site has everything. Without an explicit provider, a lookup walks the registry until one has the song, and reports which providers it passed over.
 - **Synchronized lyrics.** LRCLIB serves LRC, and `parseLrc`, `lrcToPlain` and `lineAt` read it locally - no key, no network, no rate limit.
 - **Translations.** Tekstowo.pl carries community translations, exposed as `translation` on the result.
-- **Honest capabilities.** A provider declares what it serves; unsupported operations throw `UnsupportedOperationError` rather than pretending. A layout change on a scraped site is a `ParseError`, distinct from the site saying it has no such song.
+- **Failures say which kind they are.** "This site has no such song" and "this site changed its layout" are different problems with different fixes, so they are `NotFoundError` and `ParseError`, never one vague failure. Asking a provider for something it does not serve fails before the request, not halfway through it.
 - **Attribution travels with the text.** Every result carries the source URL and the provider's attribution line, and every text surface prints them under the lyrics.
-- **CLI, library, MCP and agent extensions.** The same provider contract from a terminal, TypeScript, an MCP client, OMP, Pi or the Vercel AI SDK.
-- **Keys never leak.** Error messages redact secret query params - the Musixmatch `apikey` included - before anyone sees them.
+- **Five surfaces, one core.** Terminal, TypeScript, MCP client, Pi, OMP and the Vercel AI SDK all go through the same selection and formatting code, so none of them can drift into its own behaviour.
+- **Keys never leak.** The Musixmatch key rides in a query param, which means every failed request would otherwise print it. Redaction happens in the error constructor, so there is no call site left to forget it.
 
 ## Install
 
