@@ -1,132 +1,176 @@
-# Lyrics
+# @agntn/lyrics
 
-Six lyrics sites, one shape.
+[![npm version](https://npmx.dev/api/registry/badge/version/@agntn/lyrics)](https://npmx.dev/package/@agntn/lyrics)
+[![npm downloads](https://npmx.dev/api/registry/badge/downloads/@agntn/lyrics)](https://npmx.dev/package/@agntn/lyrics)
+[![license](https://npmx.dev/api/registry/badge/license/@agntn/lyrics)](https://npmx.dev/package/@agntn/lyrics)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/agntn/lyrics)
 
-No single site has every song, and the API you would reach for first, Genius, serves everything about a track except its actual words. So a lookup that works in practice means trying several backends and knowing what each one will refuse. That is this library: six providers behind one TypeScript API and one CLI, walked in order until one has the track.
+🎵 Six lyrics providers. Ask for a song, get its words, timestamps and source when available.
 
-## Features
+## Why?
 
-- **Six providers, one contract.** LRCLIB, lyrics.ovh, Genius, Tekstowo.pl, AZLyrics and Musixmatch.
-- **Works before the first key.** Four of the six need no credentials at all, so `lyrics get Radiohead Creep` works on a fresh checkout.
-- **Falls through misses.** No single site has everything. Without an explicit provider, a lookup walks the registry until one has the song, and reports which providers it passed over.
-- **Synchronized lyrics.** LRCLIB serves LRC, and `parseLrc`, `lrcToPlain` and `lineAt` read it locally - no key, no network, no rate limit.
-- **Translations.** Tekstowo.pl carries community translations, exposed as `translation` on the result.
-- **Failures say which kind they are.** "This site has no such song" and "this site changed its layout" are different problems with different fixes, so they are `NotFoundError` and `ParseError`, never one vague failure. Asking a provider for something it does not serve fails before the request, not halfway through it.
-- **Attribution travels with the text.** Every result carries the source URL and the provider's attribution line, and every text surface prints them under the lyrics.
-- **Five surfaces, one core.** Terminal, TypeScript, MCP client, Pi, OMP and the Vercel AI SDK all go through the same selection and formatting code, so none of them can drift into its own behaviour.
-- **Keys never leak.** The Musixmatch key rides in a query param, which means every failed request would otherwise print it. Redaction happens in the error constructor, so there is no call site left to forget it.
+Genius knows plenty about a song, but its API won't give you the lyrics. Other sites have the words, each with its own catalogue and quirks. Apparently remembering the chorus was the easy part. This package puts six providers behind one TypeScript API and CLI.
 
-## Install
+## ✨ Features
+
+- 🔎 **Find the track first.** Search by artist and title, then use a provider's track ID for a more specific lookup.
+- 🔑 **Start without credentials.** LRCLIB, lyrics.ovh, Tekstowo and AZLyrics need no key.
+- 🪜 **Try the next catalogue.** Lyrics lookups can skip missing tracks, auth failures, paywalls, unsupported operations and parse errors. Rate limits and transport failures still stop the call.
+- ⏱️ **Follow the timestamps.** LRCLIB supplies LRC. Parse it or find the current line locally.
+- 🌍 **Read a translation.** Tekstowo exposes community translations alongside the original text, when available.
+- 🤖 **Bring your agent.** MCP, Pi, OMP and Vercel AI SDK tools sit alongside the CLI and library.
+- 📎 **Keep the source attached.** Results can include source URLs and attribution. Keep them when displaying the text.
+
+## 📦 Install
+
+Requires Node.js 24 or newer.
 
 ```bash
 pnpm add @agntn/lyrics
 ```
 
-Requires Node.js 24 or newer.
+The package is not published to npm yet. Registry install commands here are for use after publication. For now, use the checkout instructions under Development.
 
-## CLI
+## 🚀 First call
+
+Start by checking which providers are available:
 
 ```bash
 npx @agntn/lyrics providers
-npx @agntn/lyrics get "Radiohead" "Creep"
-npx @agntn/lyrics get "Kult" "Arahja" -p tekstowo --translation
-npx @agntn/lyrics search "radiohead creep" -n 5
-npx @agntn/lyrics synced "Radiohead" "Creep" --at 45
 ```
+
+Output from the local build, with both credential variables unset:
+
+```text
+Registered providers (6):
+  lrclib: search, lyrics, synced
+  lyricsovh: lyrics
+  genius: search, lyrics [needs GENIUS_ACCESS_TOKEN]
+  tekstowo: search, lyrics, translation
+  azlyrics: lyrics
+  musixmatch: search, lyrics [needs MUSIXMATCH_API_KEY]
+
+ℹ Use --provider <name> to select one, --provider all to compare every provider, or leave it out to walk providers until one has the song
+```
+
+No key needed for this check. After installation, use `pnpm exec lyrics` for the commands below.
 
 ### Commands
 
-| Command     | What it does                                    | Example                                 |
-| ----------- | ----------------------------------------------- | --------------------------------------- |
-| `get`       | Lyrics of one track                             | `lyrics get "Kult" "Arahja"`            |
-| `search`    | Tracks matching a free-form query               | `lyrics search "arahja"`                |
-| `synced`    | LRC lyrics, or the line at a given second       | `lyrics synced "Kult" "Arahja" --at 45` |
-| `providers` | Registered providers, capabilities, credentials | `lyrics providers`                      |
-| `mcp`       | MCP server over stdio                           | `lyrics mcp`                            |
+| Command     | What you get                                      | Example                                               |
+| ----------- | ------------------------------------------------- | ----------------------------------------------------- |
+| `get`       | One track's lyrics                                | `pnpm exec lyrics get "Radiohead" "Creep"`            |
+| `search`    | Matching tracks                                   | `pnpm exec lyrics search "radiohead creep" -n 5`      |
+| `synced`    | LRC, or the line at a given second                | `pnpm exec lyrics synced "Radiohead" "Creep" --at 45` |
+| `providers` | Provider capabilities and credential requirements | `pnpm exec lyrics providers`                          |
+| `mcp`       | MCP server over stdio                             | `pnpm exec lyrics mcp`                                |
 
-### Common options
+Want a translation? Try `pnpm exec lyrics get "Kult" "Arahja" -p tekstowo --translation`. Use `get --help`, `search --help` or `synced --help` for each command's options.
 
-| Option              | Meaning                                                                    |
-| ------------------- | -------------------------------------------------------------------------- |
-| `-p, --provider`    | Provider key, or `all` to compare every provider. Omit to walk until a hit |
-| `-d, --duration`    | Track length in seconds, to pick between recordings of the same title      |
-| `-s, --synced`      | Print the synchronized text when the provider has it                       |
-| `-t, --translation` | Print the translation instead of the original                              |
-| `-n, --limit`       | Maximum number of results for `search`                                     |
-| `--at`              | Offset in seconds for `synced`                                             |
-
-## Providers
-
-| Provider     | Credential            | search | lyrics | synced | translation | Notes                                          |
-| ------------ | --------------------- | :----: | :----: | :----: | :---------: | ---------------------------------------------- |
-| `lrclib`     | none                  |   ✓    |   ✓    |   ✓    |             | Open community database; plain and LRC         |
-| `lyricsovh`  | none                  |        |   ✓    |        |             | One endpoint: artist plus title, or a 404      |
-| `genius`     | `GENIUS_ACCESS_TOKEN` |   ✓    |   ✓    |        |             | Token for search; text read off the song page  |
-| `tekstowo`   | none                  |   ✓    |   ✓    |        |      ✓      | Polish catalogue with community translations   |
-| `azlyrics`   | none                  |        |   ✓    |        |             | Deterministic page URL; strong older catalogue |
-| `musixmatch` | `MUSIXMATCH_API_KEY`  |   ✓    |   ✓    |        |             | Licensed API; the free plan returns an excerpt |
-
-Without `--provider`, requests go to the first registered provider that serves the operation and has whatever credential it needs. A configured key _adds_ a provider rather than taking over: on the free Musixmatch plan a key buys an excerpt where keyless LRCLIB returns the whole song, so promoting the keyed provider would be a downgrade.
-
-## Library
+## 🧠 Library
 
 ```ts
-import { lyricsWithFallback, lineAt, parseLrc } from "@agntn/lyrics";
+import { formatLyrics, lyricsWithFallback } from "@agntn/lyrics";
 
-const { provider, lyrics, skipped } = await lyricsWithFallback({
+const { lyrics, skipped } = await lyricsWithFallback({
   artist: "Radiohead",
   track: "Creep",
   duration: 239,
 });
 
-console.log(provider, lyrics.url, lyrics.attribution);
-if (lyrics.synced) console.log(lineAt(lyrics.synced, 45), parseLrc(lyrics.synced).length);
+console.log(formatLyrics(lyrics));
+console.log(skipped);
 ```
 
-Pick one backend explicitly when you care which catalogue answers:
+You get the song and a record of providers passed over. `formatLyrics()` prints the source and attribution when provided. Need a particular catalogue? Use `create("lrclib").lyrics(query)` instead. For comparisons, `searchAll()` and `lyricsAll()` return each provider's result or error.
+
+Already have LRC? No request needed. These lines are invented:
 
 ```ts
-import { create, requireOperation, searchAll } from "@agntn/lyrics";
+import { lineAt, parseLrc } from "@agntn/lyrics";
 
-const matches = await create("tekstowo").search?.("kult arahja");
-const outcomes = await searchAll("creep"); // every provider in parallel, failures included
-const song = await requireOperation(
-  create("lrclib"),
-  "lyrics",
-)({
-  artist: "Radiohead",
-  track: "Creep",
-});
+const lines = parseLrc("[00:10.00] The kettle joins the band\n[00:20.50] Nobody hired the spoon");
+console.log(lineAt(lines, 21));
 ```
 
-## MCP server
+```text
+{ time: 20.5, text: 'Nobody hired the spoon' }
+```
+
+See the [result types](./src/core/types.ts), [exports](./src/index.ts) and [LRC helpers](./src/core/text.ts) for the rest.
+
+## 🗺️ Providers
+
+| Provider     | Credentials                                   | Search | Lyrics | LRC | Translation |
+| ------------ | --------------------------------------------- | :----: | :----: | :-: | :---------: |
+| `lrclib`     | None                                          |   ✓    |   ✓    |  ✓  |             |
+| `lyricsovh`  | None                                          |        |   ✓    |     |             |
+| `genius`     | `GENIUS_ACCESS_TOKEN` for search or track IDs |   ✓    |   ✓    |     |             |
+| `tekstowo`   | None                                          |   ✓    |   ✓    |     |      ✓      |
+| `azlyrics`   | None                                          |        |   ✓    |     |             |
+| `musixmatch` | `MUSIXMATCH_API_KEY`                          |   ✓    |   ✓    |     |             |
+
+`get` tries providers in registration order. `search` selects the first usable search provider. Pass `-p all` to either command for comparison, or name one provider to avoid fallback. Adding a key doesn't promote that provider. See the [provider implementations](./src/providers).
+
+Genius can fetch lyrics without a token using an artist/title URL, but spelling differences can make that miss. Musixmatch's free plan returns an excerpt marked `partial: true`.
+
+## 🤖 Agents
+
+Install the extension for your harness:
 
 ```bash
-claude mcp add lyrics --scope user -- npx -y @agntn/lyrics mcp
+pi install @agntn/lyrics
+omp install @agntn/lyrics
 ```
 
-Tools: `lyrics_providers`, `lyrics_search`, `lyrics_get`, `lyrics_line_at`. All read-only; `lyrics_line_at` runs locally on LRC text you already have.
+For an MCP client that accepts `mcpServers` configuration:
 
-## Agent extensions
+```json
+{
+  "mcpServers": {
+    "lyrics": {
+      "command": "npx",
+      "args": ["-y", "@agntn/lyrics", "mcp"]
+    }
+  }
+}
+```
+
+MCP and both extensions expose `lyrics_get`, `lyrics_search`, `lyrics_line_at` and `lyrics_providers`. The line lookup works locally on supplied LRC. Using Vercel AI SDK instead? Install the `ai` peer dependency and import tools from `@agntn/lyrics/ai`. See the [tool exports](./src/ai.ts) and [MCP server](./src/mcp.ts).
+
+## 🚫 Copyright still applies
+
+Fetching lyrics doesn't license them to you. Keep the source URL and attribution with any text you display. Quote only the shortest excerpt your task needs.
+
+Genius, Tekstowo and AZLyrics read HTML. Their terms restrict automated access, and layout changes can cause `ParseError`. Musixmatch uses a licensed API, subject to its plan and terms. Choosing acceptable sources is your responsibility as the operator.
+
+## 🧩 Adding a provider
+
+Have another catalogue? Extend [Provider](./src/core/provider.ts), declare its capabilities and call [register()](./src/core/registry.ts). The [lyrics.ovh implementation](./src/providers/lyricsovh.ts) is a small example. Search is optional, lyrics retrieval isn't.
+
+## 🛠️ Development
+
+From a checkout:
 
 ```bash
-pi install @agntn/lyrics     # Pi
-omp install @agntn/lyrics    # OMP
+pnpm install
+pnpm build
+node dist/cli.mjs providers
 ```
 
-Both register `lyrics_get`, `lyrics_search`, `lyrics_line_at` and `lyrics_providers`.
+```bash
+pnpm test       # Provider tests use mocked requests
+pnpm typecheck  # Core and extension types, including a build
+pnpm lint       # Lint and formatting checks
+pnpm fmt        # Apply lint fixes and formatting
+```
 
-## Copyright
+Tests use invented lyrics, not fragments of real songs. Please keep it that way.
 
-Song lyrics are copyrighted works. This library fetches them from services that host them; it does not license them to you.
+## 💛 Thanks
 
-- Results carry `url` and `attribution`, and every text surface prints them under the lyrics. Keep them there.
-- `genius`, `tekstowo` and `azlyrics` read the sites' HTML. Their terms of service restrict automated access, and the selectors break whenever a layout changes - that surfaces as `ParseError`, not as a missing song.
-- `musixmatch` is the licensed path. Its free plan returns an excerpt, which the result marks with `partial: true`.
-- Quote the shortest excerpt your task needs. Reproducing whole songs is what rights holders object to, and the agent extensions say so in their prompt guidelines.
+[Claude for Open Source](https://claude.com/contact-sales/claude-for-oss) and [Codex for Open Source](https://developers.openai.com/community/codex-for-oss) help make this package possible. More time for the code, fewer tabs to juggle.
 
-Which of these is acceptable is your call as the operator, not this library's.
+## 📄 License
 
-## License
-
-MIT
+[MIT](./LICENSE). The package's code, not the songs.
