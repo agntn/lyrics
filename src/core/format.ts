@@ -36,6 +36,13 @@ export function formatLyricsHeader(lyrics: Lyrics): string {
   return `[${lyrics.provider}] ${lyrics.artist} - ${lyrics.track}${tail}`;
 }
 
+/** Source and attribution for displayed text; the provider name stands in for a missing URL. */
+export function formatLyricsFooter(lyrics: Lyrics): string {
+  return [`Source: ${lyrics.url ?? lyrics.provider}`, lyrics.attribution]
+    .filter(Boolean)
+    .join("\n");
+}
+
 /**
  * Full lyrics rendering: header, text, then source and attribution.
  *
@@ -49,16 +56,7 @@ export function formatLyrics(lyrics: Lyrics, options?: { synced?: boolean }): st
       lyrics.plain ??
       lyrics.synced ??
       "(no text returned)");
-  return [
-    formatLyricsHeader(lyrics),
-    "",
-    body,
-    "",
-    lyrics.url ? `Source: ${lyrics.url}` : null,
-    lyrics.attribution ? lyrics.attribution : null,
-  ]
-    .filter((line) => line !== null)
-    .join("\n");
+  return [formatLyricsHeader(lyrics), body, formatLyricsFooter(lyrics)].join("\n\n");
 }
 
 /** Translation rendering, or a clear note when the provider returned none. */
@@ -66,15 +64,7 @@ export function formatTranslation(lyrics: Lyrics): string {
   if (!lyrics.translation) {
     return `${formatLyricsHeader(lyrics)}\n\n(no translation from ${lyrics.provider})`;
   }
-  return [
-    formatLyricsHeader(lyrics),
-    "",
-    lyrics.translation,
-    "",
-    lyrics.url ? `Source: ${lyrics.url}` : null,
-  ]
-    .filter((line) => line !== null)
-    .join("\n");
+  return [formatLyricsHeader(lyrics), lyrics.translation, formatLyricsFooter(lyrics)].join("\n\n");
 }
 
 /** Side-by-side search results from every registered provider, failures included. */

@@ -57,6 +57,7 @@ export {
   formatLyrics,
   formatLyricsAll,
   formatLyricsHeader,
+  formatLyricsFooter,
   formatProviders,
   formatSearchAll,
   formatTrackLine,

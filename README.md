@@ -67,6 +67,8 @@ No key needed for this check. After installation, use `pnpm exec lyrics` for the
 
 Want a translation? Try `pnpm exec lyrics get "Kult" "Arahja" -p tekstowo --translation`. Use `get --help`, `search --help` or `synced --help` for each command's options.
 
+`lyrics synced` prints a source footer after the LRC or selected line, including attribution when provided. Need just the LRC for a player? Use the library result's `synced` field.
+
 ## 🧠 Library
 
 ```ts

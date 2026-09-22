@@ -3,6 +3,7 @@ import {
   formatFallback,
   formatLyrics,
   formatLyricsHeader,
+  formatLyricsFooter,
   formatProviders,
   formatTrackLine,
   formatTracks,
@@ -26,6 +27,25 @@ const LYRICS: Lyrics = {
   url: "https://lrclib.net/api/get/496",
   attribution: "Placeholder attribution",
 };
+
+describe("formatLyricsFooter", () => {
+  it.each([
+    {
+      url: "https://example.com/track",
+      attribution: "Credit",
+      expected: "Source: https://example.com/track\nCredit",
+    },
+    {
+      url: "https://example.com/track",
+      attribution: undefined,
+      expected: "Source: https://example.com/track",
+    },
+    { url: undefined, attribution: "Credit", expected: "Source: lrclib\nCredit" },
+    { url: undefined, attribution: undefined, expected: "Source: lrclib" },
+  ])("renders available provenance: $expected", ({ url, attribution, expected }) => {
+    expect(formatLyricsFooter({ ...LYRICS, url, attribution })).toBe(expected);
+  });
+});
 
 describe("formatLyrics", () => {
   it("keeps the source URL and attribution with the text", () => {
@@ -67,9 +87,10 @@ describe("formatLyrics", () => {
 });
 
 describe("formatTranslation", () => {
-  it("prints the translation when there is one", () => {
-    expect(formatTranslation({ ...LYRICS, translation: "Pierwsza linia" })).toContain(
-      "Pierwsza linia",
+  it("keeps the source and attribution with translated text", () => {
+    expect(formatTranslation({ ...LYRICS, translation: "Translated placeholder line" })).toBe(
+      "[lrclib] Placeholder Artist - Placeholder Song  (Placeholder Album, 3:59, synced available)\n\n" +
+        "Translated placeholder line\n\nSource: https://lrclib.net/api/get/496\nPlaceholder attribution",
     );
   });
 

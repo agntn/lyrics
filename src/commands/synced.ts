@@ -2,6 +2,7 @@
 import { defineCommand } from "citty";
 import consola from "consola";
 import { lyricsWithFallback } from "../core/all.ts";
+import { formatLyricsFooter } from "../core/format.ts";
 import { formatDuration, lineAt } from "../core/text.ts";
 import { requireOperation } from "../core/provider.ts";
 import { selectProvider, usableProviders } from "../core/resolve.ts";
@@ -54,15 +55,16 @@ export default defineCommand({
       }
 
       if (args.at === undefined) {
-        consola.log(lyrics.synced);
+        consola.log(`${lyrics.synced}\n\n${formatLyricsFooter(lyrics)}`);
         return;
       }
 
       const seconds = parseNumericArg(args.at, "offset") ?? 0;
       const line = lineAt(lyrics.synced, seconds);
-      consola.log(
-        line ? `[${formatDuration(line.time)}] ${line.text}` : `(nothing sung at ${args.at}s)`,
-      );
+      const text = line
+        ? `[${formatDuration(line.time)}] ${line.text}`
+        : `(nothing sung at ${args.at}s)`;
+      consola.log(`${text}\n\n${formatLyricsFooter(lyrics)}`);
     } catch (error) {
       consola.error(`Error: ${error instanceof Error ? error.message : error}`);
       process.exit(1);
