@@ -1,4 +1,6 @@
 import { vi } from "vitest";
+import { Provider } from "../src/core/provider.ts";
+import type { Lyrics } from "../src/core/types.ts";
 
 /**
  * Placeholder lyrics used across the suite.
@@ -11,6 +13,30 @@ export const FAKE_PLAIN = "First placeholder line\nSecond placeholder line\nThir
 /** The same placeholder text with LRC timestamps. */
 export const FAKE_SYNCED =
   "[00:10.00] First placeholder line\n[00:20.50] Second placeholder line\n[01:00.00] Third placeholder line";
+
+/** Local provider for testing attribution on surfaces that fetch synchronized lyrics. */
+export class AttributedProvider extends Provider {
+  static readonly key = "attributed";
+
+  get capabilities() {
+    return { search: false, lyrics: true, synced: true, translation: true };
+  }
+
+  async lyrics(): Promise<Lyrics> {
+    return {
+      provider: AttributedProvider.key,
+      artist: "Placeholder Artist",
+      track: "Placeholder Song",
+      plain: FAKE_PLAIN,
+      synced: FAKE_SYNCED,
+      translation: "Translated placeholder line",
+      instrumental: false,
+      partial: false,
+      url: "https://example.com/placeholder",
+      attribution: "Placeholder attribution",
+    };
+  }
+}
 
 /** LRCLIB record shape, as `/api/get` returns it, with placeholder text. */
 export const LRCLIB_TRACK = {

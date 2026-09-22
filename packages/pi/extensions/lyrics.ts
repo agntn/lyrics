@@ -178,7 +178,7 @@ export default function lyricsExtension(pi: ExtensionAPI): void {
       const line = lib.lineAt(lyrics.synced, params.seconds);
       return textResult(
         line
-          ? `[${lib.formatDuration(line.time)}] ${line.text}\n\nSource: ${lyrics.url ?? lyrics.provider}`
+          ? `[${lib.formatDuration(line.time)}] ${line.text}\n\n${lib.formatLyricsFooter(lyrics)}`
           : `(nothing sung at ${params.seconds}s)`,
       );
     },

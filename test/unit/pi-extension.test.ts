@@ -5,7 +5,8 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Value } from "typebox/value";
-import { FAKE_PLAIN, FAKE_SYNCED, LRCLIB_TRACK, requireTool, stubJSON } from "../helpers.ts";
+import { AttributedProvider, LRCLIB_TRACK, requireTool, stubJSON } from "../helpers.ts";
+import { register } from "../../src/core/registry.ts";
 import lyricsExtension from "../../packages/pi/extensions/lyrics.ts";
 
 /** SAFETY: the extension only calls registerTool during registration; the fake implements that seam. */
@@ -114,6 +115,35 @@ describe("lyrics Pi extension", () => {
       type: "text",
       text: expect.stringContaining("[0:20] Second placeholder line"),
     });
+  });
+
+  it("keeps attribution with a fetched line", async () => {
+    register(AttributedProvider);
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const tool = requireTool(registerExtensionTools(), "lyrics_line_at");
+
+    const result = await tool.execute?.(
+      "attributed-line",
+      {
+        artist: "Placeholder Artist",
+        track: "Placeholder Song",
+        seconds: 25,
+        provider: "attributed",
+      },
+      undefined,
+      undefined,
+      unusedContext,
+    );
+
+    expect(result?.content).toEqual([
+      {
+        type: "text",
+        text: "[0:20] Second placeholder line\n\nSource: https://example.com/placeholder\nPlaceholder attribution",
+      },
+    ]);
+    expect(result?.details).toBeUndefined();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("lists providers with the credentials they still need", async () => {
