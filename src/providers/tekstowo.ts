@@ -76,7 +76,7 @@ class Tekstowo extends Provider {
     assertQuery(query, Tekstowo.key);
     const url = `${this.baseUrl}/szukaj/${encodeURIComponent(query.trim())}`;
     const page = await this.getText(url);
-    const rows = parseHtml(page).querySelectorAll(RESULT_SELECTOR);
+    const rows = (await parseHtml(page)).querySelectorAll(RESULT_SELECTOR);
     const matches: TrackMatch[] = [];
     for (const row of rows) {
       const href = row.getAttribute("href");
@@ -98,7 +98,7 @@ class Tekstowo extends Provider {
       );
     }
     const url = `${this.baseUrl}/${query.id ?? tekstowoPath(query.artist, query.track)}`;
-    const root = parseHtml(await this.getText(url));
+    const root = await parseHtml(await this.getText(url));
     const plain = requireLyrics(root, LYRICS_SELECTOR, Tekstowo.key, url);
     const heading = selectText(root, "h1")?.replace(/\s+/g, " ") ?? "";
     const { artist, track } = splitLabel(heading, { artist: query.artist, track: query.track });

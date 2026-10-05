@@ -6,7 +6,6 @@
  * problem rather than three.
  */
 
-import { parse } from "node-html-parser";
 import type { HTMLElement } from "node-html-parser";
 import { ParseError } from "./errors.ts";
 import { normalizeLyrics } from "./text.ts";
@@ -17,8 +16,10 @@ import { normalizeLyrics } from "./text.ts";
  * Lyrics markup separates lines with `<br>`, which carries no text of its own; substituting
  * before parsing is what preserves the line structure that `.text` would otherwise flatten.
  * `.text` then decodes HTML entities, so apostrophes and dashes come out as characters.
+ * The parser loads on the first page, so code that never scrapes one never loads its 110 kB.
  */
-export function parseHtml(html: string): HTMLElement {
+export async function parseHtml(html: string): Promise<HTMLElement> {
+  const { parse } = await import("node-html-parser");
   return parse(html.replace(/<br\s*\/?>/gi, "\n"));
 }
 
