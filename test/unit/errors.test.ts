@@ -1,4 +1,3 @@
-import { FetchError } from "ofetch";
 import { describe, expect, it } from "vitest";
 import {
   AuthError,
@@ -7,20 +6,13 @@ import {
   NotFoundError,
   PaymentError,
   RateLimitError,
+  ResponseError,
   normalizeError,
 } from "../../src/core/errors.ts";
 
-/** Build the structured failure ofetch throws, with the fields normalizeError reads. */
-function fetchError(status: number, url: string, data?: unknown, headers?: Record<string, string>) {
-  const error = new FetchError(`[GET] "${url}": ${status}`);
-  Object.assign(error, {
-    statusCode: status,
-    status,
-    request: url,
-    data,
-    response: { status, headers: new Headers(headers ?? {}) },
-  });
-  return error;
+/** Build the failure the HTTP client throws for a rejected status, before classification. */
+function responseError(status: number, url: string, body = "", headers?: Record<string, string>) {
+  return new ResponseError(status, url, body, new Headers(headers ?? {}));
 }
 
 describe("normalizeError", () => {
@@ -32,7 +24,7 @@ describe("normalizeError", () => {
     [429, RateLimitError],
     [500, HTTPError],
   ])("maps HTTP %s onto the right class", (status, expected) => {
-    const error = normalizeError(fetchError(status, "https://api.test/x"), "lrclib");
+    const error = normalizeError(responseError(status, "https://api.test/x"), "lrclib");
 
     expect(error).toBeInstanceOf(expected);
     expect(error.provider).toBe("lrclib");
@@ -40,7 +32,7 @@ describe("normalizeError", () => {
 
   it("reads retry-after off the response headers", () => {
     const error = normalizeError(
-      fetchError(429, "https://api.test/x", undefined, { "retry-after": "30" }),
+      responseError(429, "https://api.test/x", undefined, { "retry-after": "30" }),
       "lrclib",
     );
 
@@ -81,7 +73,7 @@ describe("secret redaction", () => {
 
   it("redacts a key carried in a normalized transport failure", () => {
     const error = normalizeError(
-      fetchError(500, "https://api.test/x?token=SECRET123"),
+      responseError(500, "https://api.test/x?token=SECRET123"),
       "musixmatch",
     );
 

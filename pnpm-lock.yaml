@@ -20,9 +20,6 @@ importers:
       node-html-parser:
         specifier: 9.0.4
         version: 9.0.4
-      ofetch:
-        specifier: 1.5.1
-        version: 1.5.1
       zod:
         specifier: 4.4.3
         version: 4.4.3
