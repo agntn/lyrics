@@ -11,6 +11,12 @@ const SONG_PAGE = `<html><body>
   <div data-lyrics-container="true">Third placeholder line</div>
 </body></html>`;
 
+/** Live layout: Genius parks the page header inside the first container, before the first line. */
+const SONG_PAGE_WITH_HEADER = `<html><body>
+  <div data-lyrics-container="true"><div data-exclude-from-selection="true"><div>12 Contributors</div><div>TranslationsPolski</div><div>A placeholder blurb about the song… Read More</div></div>First placeholder line<br>Second placeholder line</div>
+  <div data-lyrics-container="true">Third placeholder line</div>
+</body></html>`;
+
 const SEARCH_RESPONSE = {
   response: {
     hits: [
@@ -68,6 +74,14 @@ describe("genius provider", () => {
       url: "https://genius.com/Placeholder-artist-placeholder-song-lyrics",
       attribution: "Lyrics hosted by Genius",
     });
+  });
+
+  it("leaves the page header out of the text", async () => {
+    stubHTML(SONG_PAGE_WITH_HEADER);
+
+    const lyrics = await create("genius").lyrics({ artist: "a", track: "b" });
+
+    expect(lyrics.plain).toBe(FAKE_PLAIN);
   });
 
   it("resolves the page through the API when a token is configured", async () => {
