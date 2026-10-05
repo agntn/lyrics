@@ -55,7 +55,7 @@ class AzLyrics extends Provider {
     assertTrackQuery(query, AzLyrics.key);
     const url = `${this.baseUrl}/${azlyricsPath(query.artist, query.track)}`;
     const plain = requireLyrics(
-      parseHtml(await this.getText(url)),
+      await parseHtml(await this.getText(url)),
       LYRICS_SELECTOR,
       AzLyrics.key,
       url,

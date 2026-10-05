@@ -115,7 +115,7 @@ class Genius extends Provider {
     const song = await this.findSong(query);
     const url = song?.url ?? geniusSongUrl(query.artist, query.track);
     const page = await this.getText(url);
-    const plain = requireLyrics(parseHtml(page), LYRICS_SELECTOR, Genius.key, url);
+    const plain = requireLyrics(await parseHtml(page), LYRICS_SELECTOR, Genius.key, url);
     return {
       provider: Genius.key,
       artist: song?.primary_artist?.name ?? query.artist,
