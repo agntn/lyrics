@@ -31,6 +31,9 @@ const SITE_URL = "https://genius.com";
 /** The lyrics of a song page live in these containers, one per section. */
 const LYRICS_SELECTOR = "[data-lyrics-container]";
 
+/** Page header Genius tucks into the first container: contributor count, translations, blurb. */
+const PAGE_HEADER_SELECTOR = "[data-exclude-from-selection]";
+
 interface GeniusSong {
   id: number;
   title?: string;
@@ -115,7 +118,9 @@ class Genius extends Provider {
     const song = await this.findSong(query);
     const url = song?.url ?? geniusSongUrl(query.artist, query.track);
     const page = await this.getText(url);
-    const plain = requireLyrics(await parseHtml(page), LYRICS_SELECTOR, Genius.key, url);
+    const root = await parseHtml(page);
+    for (const header of root.querySelectorAll(PAGE_HEADER_SELECTOR)) header.remove();
+    const plain = requireLyrics(root, LYRICS_SELECTOR, Genius.key, url);
     return {
       provider: Genius.key,
       artist: song?.primary_artist?.name ?? query.artist,
