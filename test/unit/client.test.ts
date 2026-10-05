@@ -200,7 +200,7 @@ describe("deadline and cancellation", () => {
     await expect(getJSON(URL_, { timeout: 1.5 })).resolves.toEqual({ ok: true });
   });
 
-  it.each([Number.NaN, -1, Number.POSITIVE_INFINITY, 2 ** 31])(
+  it.each([Number.NaN, -1, -0.5, Number.POSITIVE_INFINITY, 2 ** 31])(
     "refuses a timeout of %s before sending anything",
     async (timeout) => {
       const fetch = stubFetch(async () => Response.json({}));

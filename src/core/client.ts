@@ -69,13 +69,14 @@ async function get(url: string, request: Request, options?: ClientOptions): Prom
 
 /** The caller's signal joined with the deadline. A bad timeout fails here, not 1 ms in flight. */
 function requestSignal(options?: ClientOptions): AbortSignal | undefined {
-  const timeout = Math.ceil(options?.timeout ?? DEFAULT_TIMEOUT_MS);
-  if (!(timeout >= 0 && timeout <= MAX_TIMEOUT_MS)) {
+  const requested = options?.timeout ?? DEFAULT_TIMEOUT_MS;
+  if (!(requested >= 0 && requested <= MAX_TIMEOUT_MS)) {
     throw new InvalidInputError(
       `timeout must be between 0 and ${MAX_TIMEOUT_MS} ms, got ${options?.timeout}`,
       options?.provider,
     );
   }
+  const timeout = Math.ceil(requested);
   const signals = [options?.signal, timeout > 0 ? AbortSignal.timeout(timeout) : undefined].filter(
     (signal) => signal !== undefined,
   );
