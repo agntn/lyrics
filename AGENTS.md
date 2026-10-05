@@ -62,13 +62,13 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 - `src/core/all.ts` - `searchAll`, `lyricsAll`, `lyricsWithFallback`, `serializeOutcomes`
 - `src/core/format.ts` - plain-text formatters shared by every output surface
 - `src/core/schemas.ts` - zod input fragments shared by the MCP server and the AI tools
-- `src/core/client.ts` - ofetch wrapper: `getJSON`, `getText` (HTML), 15 s timeout, no retry, identifying User-Agent
+- `src/core/client.ts` - native `fetch` wrapper: `getJSON` parses the body whatever its content type, `getText` keeps HTML a string; 15 s timeout joined with the caller's `signal`, no retry, identifying User-Agent. A 4xx or 5xx becomes a `ResponseError`, which `normalizeError()` classifies before it leaves the client
 - `src/providers/*.ts` - one file per provider, self-registering via `register()`; order in `index.ts` is the fallback order
 - `src/mcp.ts` - `createMcpServer()`, four read-only tools (`lyrics_line_at` is local)
 - `src/commands/mcp.ts` - imports the SDK inside `run()`, not at module scope: citty resolves every lazy subcommand to read its `meta`, so a top-level import puts the MCP SDK into the startup path of `lyrics --help` and every other command
 - `src/ai.ts` - Vercel AI SDK tool surface
 - `src/cli.ts` + `src/commands/*.ts` - citty CLI with lazy subcommands
-- `packages/pi/extensions/lyrics.ts`, `packages/omp/extensions/lyrics.ts` - agent extensions; type-import from `dist/index.d.mts`. The OMP loader keeps both dynamic imports literal: `existsSync(src)` chooses `import("../../../src/index.ts")` or `import("../../../dist/index.mjs")`. An `import(url.href)` loses `ofetch` resolution in the compiled binary
+- `packages/pi/extensions/lyrics.ts`, `packages/omp/extensions/lyrics.ts` - agent extensions; type-import from `dist/index.d.mts`. The OMP loader keeps both dynamic imports literal: `existsSync(src)` chooses `import("../../../src/index.ts")` or `import("../../../dist/index.mjs")`. An `import(url.href)` loses dependency resolution in the compiled binary
 
 ## Constraints
 
@@ -83,7 +83,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 
 ## Testing
 
-`pnpm test` (vitest, 16 files / 203 tests, all mocked via `vi.stubGlobal("fetch", ...)`).
+`pnpm test` (vitest, 18 files / 238 tests, mocked via `vi.stubGlobal("fetch", ...)`; `client.test.ts` also runs the client against a loopback `node:http` server).
 
 Packed-layout gate (manual): `pnpm pack`, install the tarball with `npm install --legacy-peer-deps` in an empty dir, register a custom provider through the main entry and confirm `lyrics_providers` from `@agntn/lyrics/mcp` lists it - this catches registry chunk splits, missing deps and broken `files`.
 
