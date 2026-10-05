@@ -87,6 +87,8 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 
 Packed-layout gate (manual): `pnpm pack`, install the tarball with `npm install --legacy-peer-deps` in an empty dir, register a custom provider through the main entry and confirm `lyrics_providers` from `@agntn/lyrics/mcp` lists it - this catches registry chunk splits, missing deps and broken `files`.
 
+Pi 1.x: the Pi peer runs `>=0.84.2 <2` and the dev pin sits on 1.0.2, so `tsc` checks the extension against the 1.x types. On 2026-10-06 the packed tarball installed next to Pi 1.0.2 without `ERESOLVE`, and a real `pi -p` session listed the providers, got `Unknown provider` back as `isError` and read a line from LRCLIB. The fence moves to the next major only after that same session.
+
 ## Build & scripts
 
 ```bash
