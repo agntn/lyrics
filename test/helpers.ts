@@ -66,6 +66,23 @@ export function stubHTML(body: string, status = 200) {
   return stubRoutes({ "": { body, status, html: true } });
 }
 
+/** Stub global fetch with requests that settle only on abort; returns the signals they got. */
+export function stubPendingFetch(): AbortSignal[] {
+  const signals: AbortSignal[] = [];
+  const fetch = vi.fn(
+    (_input: RequestInfo | URL, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal ?? undefined;
+        if (!signal) return;
+        signals.push(signal);
+        if (signal.aborted) reject(signal.reason);
+        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+      }),
+  );
+  vi.stubGlobal("fetch", fetch);
+  return signals;
+}
+
 /** Stub global fetch with a per-URL body map; unmatched URLs answer 404. */
 export function stubRoutes(
   routes: Record<string, { body: unknown; status?: number; html?: boolean }>,

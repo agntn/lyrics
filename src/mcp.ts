@@ -54,11 +54,11 @@ export function createMcpServer(): McpServer {
       },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    async ({ query, limit, provider }) => {
+    async ({ query, limit, provider }, { signal }) => {
       if (isAllProviders(provider)) {
-        return result(serializeOutcomes(await searchAll(query, { limit })));
+        return result(serializeOutcomes(await searchAll(query, { limit }, signal)));
       }
-      const selected = selectProvider(provider, "search");
+      const selected = selectProvider(provider, "search", signal);
       const search = requireOperation(selected.provider, "search");
       return providerResult(selected.name, await search(query, { limit }));
     },
@@ -79,20 +79,20 @@ export function createMcpServer(): McpServer {
       },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    async ({ artist, track, album, duration, id, provider }) => {
+    async ({ artist, track, album, duration, id, provider }, { signal }) => {
       const query = { artist, track, album, duration, id };
       if (isAllProviders(provider)) {
-        return result(serializeOutcomes(await lyricsAll(query)));
+        return result(serializeOutcomes(await lyricsAll(query, signal)));
       }
       if (!providerArg(provider)) {
-        const fallback = await lyricsWithFallback(query);
+        const fallback = await lyricsWithFallback(query, undefined, signal);
         return result({
           provider: fallback.provider,
           skipped: fallback.skipped,
           data: fallback.lyrics,
         });
       }
-      const selected = selectProvider(provider);
+      const selected = selectProvider(provider, "lyrics", signal);
       const lyrics = requireOperation(selected.provider, "lyrics");
       return providerResult(selected.name, await lyrics(query));
     },

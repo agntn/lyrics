@@ -47,6 +47,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 - Internal imports use explicit `.ts` extensions (nodenext + `allowImportingTsExtensions`); `erasableSyntaxOnly` forbids parameter properties
 - Provider registration is a class side effect: importing `src/providers/index.ts` triggers all `register()` calls - because of that, `package.json` must NOT declare `sideEffects: false`
 - One obuild bundle with four inputs (`index`, `cli`, `mcp`, `ai`) so every entry shares the chunk holding the registry
+- Cancellation rides on `ProviderConfig.signal`: the base `Provider` adds it to every request, `selectProvider()` and the fan-out helpers in `core/all.ts` take it as their last argument, and every agent surface hands over its host's signal (MCP `extra.signal`, AI SDK `abortSignal`, the third `execute` argument in Pi and OMP). An aborted fallback walk stops at the provider it reached, whatever that provider threw
 - `selectProvider()` in `core/resolve.ts` is the single selection path for the CLI, MCP, AI tools and both extensions; empty or whitespace-only arguments count as absent. The value `all` is reserved and tested with `isAllProviders()` before selection
 
 ## Key files
@@ -83,7 +84,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 
 ## Testing
 
-`pnpm test` (vitest, 19 files / 241 tests, mocked via `vi.stubGlobal("fetch", ...)`; `client.test.ts` also runs the client against a loopback `node:http` server).
+`pnpm test` (vitest, 20 files / 266 tests, mocked via `vi.stubGlobal("fetch", ...)`; `client.test.ts` also runs the client against a loopback `node:http` server).
 
 Packed-layout gate (manual): `pnpm pack`, install the tarball with `npm install --legacy-peer-deps` in an empty dir, register a custom provider through the main entry and confirm `lyrics_providers` from `@agntn/lyrics/mcp` lists it - this catches registry chunk splits, missing deps and broken `files`.
 

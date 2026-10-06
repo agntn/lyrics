@@ -19,9 +19,11 @@ import { InvalidInputError, UnsupportedOperationError } from "./errors.ts";
  */
 export abstract class Provider {
   private readonly timeout: number | undefined;
+  private readonly signal: AbortSignal | undefined;
 
   constructor(config: ProviderConfig = {}) {
     this.timeout = config.timeout;
+    this.signal = config.signal;
   }
 
   /** Registry key owned by the concrete class. */
@@ -38,12 +40,12 @@ export abstract class Provider {
   /** List tracks matching a free-form query, best match first. */
   search?(query: string, options?: SearchOptions): Promise<TrackMatch[]>;
 
-  /** Execute a provider-attributed GET request for JSON using the configured timeout. */
+  /** Execute a provider-attributed GET request for JSON using the configured timeout and signal. */
   protected getJSON<T>(
     url: string,
     options?: Omit<ClientOptions, "provider" | "timeout">,
   ): Promise<T> {
-    return getJSON<T>(url, { ...options, timeout: this.timeout, provider: this.name });
+    return getJSON<T>(url, this.requestOptions(options));
   }
 
   /** Execute a provider-attributed GET request for an HTML page. */
@@ -51,7 +53,18 @@ export abstract class Provider {
     url: string,
     options?: Omit<ClientOptions, "provider" | "timeout">,
   ): Promise<string> {
-    return getText(url, { ...options, timeout: this.timeout, provider: this.name });
+    return getText(url, this.requestOptions(options));
+  }
+
+  /** Attribute a request to this provider. Its signal and the configured one both cancel it. */
+  private requestOptions(options?: Omit<ClientOptions, "provider" | "timeout">): ClientOptions {
+    const signals = [options?.signal, this.signal].filter((signal) => signal !== undefined);
+    return {
+      ...options,
+      signal: signals.length > 1 ? AbortSignal.any(signals) : signals[0],
+      timeout: this.timeout,
+      provider: this.name,
+    };
   }
 }
 

@@ -5,7 +5,13 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Value } from "typebox/value";
-import { AttributedProvider, LRCLIB_TRACK, requireTool, stubJSON } from "../helpers.ts";
+import {
+  AttributedProvider,
+  LRCLIB_TRACK,
+  requireTool,
+  stubJSON,
+  stubPendingFetch,
+} from "../helpers.ts";
 import { register } from "../../src/core/registry.ts";
 import lyricsExtension from "../../packages/pi/extensions/lyrics.ts";
 
@@ -155,5 +161,24 @@ describe("lyrics Pi extension", () => {
       type: "text",
       text: expect.stringContaining("needs GENIUS_ACCESS_TOKEN"),
     });
+  });
+
+  it.each([
+    ["lyrics_get", { artist: "a", track: "b" }],
+    ["lyrics_get", { artist: "a", track: "b", provider: "lrclib" }],
+    ["lyrics_search", { query: "placeholder", provider: "lrclib" }],
+    ["lyrics_search", { query: "placeholder", provider: "all" }],
+    ["lyrics_line_at", { artist: "a", track: "b", seconds: 20 }],
+  ])("cancels the requests of %s %j with the host signal", async (name, params) => {
+    const signals = stubPendingFetch();
+    const tool = requireTool(registerExtensionTools(), name);
+    const controller = new AbortController();
+
+    const pending = tool.execute?.("call-4", params, controller.signal, undefined, unusedContext);
+    await vi.waitFor(() => expect(signals.length).toBeGreaterThan(0));
+    controller.abort();
+
+    await pending?.catch(() => undefined);
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
   });
 });

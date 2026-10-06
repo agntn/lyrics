@@ -84,7 +84,7 @@ console.log(formatLyrics(lyrics));
 console.log(skipped);
 ```
 
-You get the song and a record of providers passed over. `formatLyrics()` prints the source and attribution when provided. Need a particular catalogue? Use `create("lrclib").lyrics(query)` instead. For comparisons, `searchAll()` and `lyricsAll()` return each provider's result or error.
+You get the song and a record of providers passed over. `formatLyrics()` prints the source and attribution when provided. Need a particular catalogue? Use `create("lrclib").lyrics(query)` instead. For comparisons, `searchAll()` and `lyricsAll()` return each provider's result or error. Changed your mind mid-request? Pass an `AbortSignal` last, or as `signal` to `create()`.
 
 Already have LRC? No request needed. These lines are invented:
 
@@ -138,7 +138,7 @@ For an MCP client that accepts `mcpServers` configuration:
 }
 ```
 
-MCP and both extensions expose `lyrics_get`, `lyrics_search`, `lyrics_line_at` and `lyrics_providers`. The line lookup works locally on supplied LRC. Using Vercel AI SDK instead? Install the `ai` peer dependency and import tools from `@agntn/lyrics/ai`. See the [tool exports](./src/ai.ts) and [MCP server](./src/mcp.ts).
+MCP and both extensions expose `lyrics_get`, `lyrics_search`, `lyrics_line_at` and `lyrics_providers`. The line lookup works locally on supplied LRC. Hit Esc and the request behind the tool stops too. No more sitting out a 15 second timeout for a song you already gave up on. Using Vercel AI SDK instead? Install the `ai` peer dependency and import tools from `@agntn/lyrics/ai`. See the [tool exports](./src/ai.ts) and [MCP server](./src/mcp.ts).
 
 ## 🚫 Copyright still applies
 
