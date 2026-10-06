@@ -67,7 +67,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 - `src/mcp.ts` - `createMcpServer()`, four read-only tools (`lyrics_line_at` is local)
 - `src/commands/mcp.ts` - imports the SDK inside `run()`, not at module scope: citty resolves every lazy subcommand to read its `meta`, so a top-level import puts the MCP SDK into the startup path of `lyrics --help` and every other command
 - `src/ai.ts` - Vercel AI SDK tool surface
-- `src/cli.ts` + `src/commands/*.ts` - citty CLI with lazy subcommands
+- `src/cli.ts` + `src/commands/*.ts` - citty CLI with lazy subcommands. A closed stdout or stderr (`| head -1`) ends the process through an `EPIPE` listener and keeps the exit code
 - `packages/pi/extensions/lyrics.ts`, `packages/omp/extensions/lyrics.ts` - agent extensions; type-import from `dist/index.d.mts`. The OMP loader keeps both dynamic imports literal: `existsSync(src)` chooses `import("../../../src/index.ts")` or `import("../../../dist/index.mjs")`. An `import(url.href)` loses dependency resolution in the compiled binary
 
 ## Constraints
@@ -83,7 +83,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 
 ## Testing
 
-`pnpm test` (vitest, 18 files / 240 tests, mocked via `vi.stubGlobal("fetch", ...)`; `client.test.ts` also runs the client against a loopback `node:http` server).
+`pnpm test` (vitest, 19 files / 241 tests, mocked via `vi.stubGlobal("fetch", ...)`; `client.test.ts` also runs the client against a loopback `node:http` server).
 
 Packed-layout gate (manual): `pnpm pack`, install the tarball with `npm install --legacy-peer-deps` in an empty dir, register a custom provider through the main entry and confirm `lyrics_providers` from `@agntn/lyrics/mcp` lists it - this catches registry chunk splits, missing deps and broken `files`.
 
