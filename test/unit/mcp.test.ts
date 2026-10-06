@@ -6,7 +6,7 @@ import type { ProviderConstructor } from "../../src/core/provider.ts";
 import { create, getDefaultURL, register } from "../../src/core/registry.ts";
 import type { ProviderCapabilities } from "../../src/core/types.ts";
 import { createMcpServer } from "../../src/mcp.ts";
-import { FAKE_PLAIN, FAKE_SYNCED, LRCLIB_TRACK, stubJSON } from "../helpers.ts";
+import { FAKE_PLAIN, FAKE_SYNCED, LRCLIB_TRACK, stubJSON, stubPendingFetch } from "../helpers.ts";
 
 const openConnections: Array<{ close(): Promise<void> }> = [];
 
@@ -176,5 +176,26 @@ describe("Lyrics MCP server", () => {
         text: expect.stringContaining('Operation "lyrics" not supported by lrclib'),
       },
     ]);
+  });
+
+  it.each([
+    ["lyrics_get", { artist: "a", track: "b" }],
+    ["lyrics_get", { artist: "a", track: "b", provider: "lrclib" }],
+    ["lyrics_get", { artist: "a", track: "b", provider: "all" }],
+    ["lyrics_search", { query: "placeholder", provider: "lrclib" }],
+    ["lyrics_search", { query: "placeholder", provider: "all" }],
+  ])("cancels the requests of %s %j with the call", async (name, args) => {
+    const signals = stubPendingFetch();
+    const client = await connectTestClient();
+    const controller = new AbortController();
+
+    const pending = client.callTool({ name, arguments: args }, undefined, {
+      signal: controller.signal,
+    });
+    await vi.waitFor(() => expect(signals.length).toBeGreaterThan(0));
+    controller.abort();
+
+    await expect(pending).rejects.toThrow();
+    await vi.waitFor(() => expect(signals.every((signal) => signal.aborted)).toBe(true));
   });
 });

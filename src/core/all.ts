@@ -23,11 +23,14 @@ export interface SerializedOutcome<T> {
   error?: string;
 }
 
-async function runAll<T>(run: (provider: Provider) => Promise<T>): Promise<ProviderOutcome<T>[]> {
+async function runAll<T>(
+  run: (provider: Provider) => Promise<T>,
+  signal?: AbortSignal,
+): Promise<ProviderOutcome<T>[]> {
   return Promise.all(
     providers().map(async (name): Promise<ProviderOutcome<T>> => {
       try {
-        return { provider: name, result: await run(create(name)) };
+        return { provider: name, result: await run(create(name, { signal })) };
       } catch (error) {
         return { provider: name, error: normalizeError(error, name) };
       }
@@ -36,7 +39,7 @@ async function runAll<T>(run: (provider: Provider) => Promise<T>): Promise<Provi
 }
 
 /**
- * Search every registered provider in parallel.
+ * Search every registered provider in parallel. Aborting `signal` cancels every request.
  *
  * @example
  *   ```ts
@@ -48,13 +51,17 @@ async function runAll<T>(run: (provider: Provider) => Promise<T>): Promise<Provi
 export function searchAll(
   query: string,
   options?: SearchOptions,
+  signal?: AbortSignal,
 ): Promise<ProviderOutcome<TrackMatch[]>[]> {
-  return runAll((provider) => requireOperation(provider, "search")(query, options));
+  return runAll((provider) => requireOperation(provider, "search")(query, options), signal);
 }
 
 /** Fetch one track's lyrics from every registered provider in parallel, for comparison. */
-export function lyricsAll(query: TrackQuery): Promise<ProviderOutcome<Lyrics>[]> {
-  return runAll((provider) => requireOperation(provider, "lyrics")(query));
+export function lyricsAll(
+  query: TrackQuery,
+  signal?: AbortSignal,
+): Promise<ProviderOutcome<Lyrics>[]> {
+  return runAll((provider) => requireOperation(provider, "lyrics")(query), signal);
 }
 
 /** A successful fallback walk: the text plus the provider that finally had it. */
@@ -74,6 +81,7 @@ export interface FallbackResult {
  * one provider. A missing track, a missing key, a paywalled plan, or a provider that cannot
  * serve lyrics at all moves the walk on to the next candidate; anything else - a rate limit, a
  * transport failure - stops it, because retrying those on another backend hides a real problem.
+ * An aborted `signal` stops it too: the provider it reached fails, and nobody after it is asked.
  *
  * @example
  *   ```ts
@@ -87,18 +95,19 @@ export interface FallbackResult {
 export async function lyricsWithFallback(
   query: TrackQuery,
   order: string[] = providers(),
+  signal?: AbortSignal,
 ): Promise<FallbackResult> {
   const skipped: { provider: string; error: string }[] = [];
   let lastError: LyricsError | undefined;
 
   for (const name of order) {
     try {
-      const lyrics = await requireOperation(create(name), "lyrics")(query);
+      const lyrics = await requireOperation(create(name, { signal }), "lyrics")(query);
       return { provider: name, lyrics, skipped };
     } catch (error) {
       const normalized = normalizeError(error, name);
       lastError = normalized;
-      if (!isSkippable(normalized)) throw normalized;
+      if (signal?.aborted || !isSkippable(normalized)) throw normalized;
       skipped.push({ provider: name, error: normalized.message });
     }
   }

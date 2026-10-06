@@ -78,7 +78,7 @@ export default function lyricsExtension(pi: ExtensionAPI): void {
       ),
       provider: providerParameter,
     }),
-    async execute(_toolCallId, params): Promise<LyricsToolResult> {
+    async execute(_toolCallId, params, signal): Promise<LyricsToolResult> {
       const lib = await loadLibrary();
       const query = {
         artist: params.artist,
@@ -89,17 +89,17 @@ export default function lyricsExtension(pi: ExtensionAPI): void {
       };
 
       if (lib.isAllProviders(params.provider)) {
-        return textResult(lib.formatLyricsAll(await lib.lyricsAll(query)));
+        return textResult(lib.formatLyricsAll(await lib.lyricsAll(query, signal)));
       }
       if (!lib.providerArg(params.provider)) {
-        const fallback = await lib.lyricsWithFallback(query);
+        const fallback = await lib.lyricsWithFallback(query, undefined, signal);
         return textResult(
           params.translation
             ? lib.formatTranslation(fallback.lyrics)
             : lib.formatFallback(fallback, { synced: params.synced }),
         );
       }
-      const { provider } = lib.selectProvider(params.provider);
+      const { provider } = lib.selectProvider(params.provider, "lyrics", signal);
       const lyrics = await lib.requireOperation(provider, "lyrics")(query);
       return textResult(
         params.translation
@@ -128,15 +128,15 @@ export default function lyricsExtension(pi: ExtensionAPI): void {
       ),
       provider: providerParameter,
     }),
-    async execute(_toolCallId, params): Promise<LyricsToolResult> {
+    async execute(_toolCallId, params, signal): Promise<LyricsToolResult> {
       const lib = await loadLibrary();
       const options = { limit: params.limit };
       if (lib.isAllProviders(params.provider)) {
         return textResult(
-          lib.formatSearchAll(params.query, await lib.searchAll(params.query, options)),
+          lib.formatSearchAll(params.query, await lib.searchAll(params.query, options, signal)),
         );
       }
-      const { name, provider } = lib.selectProvider(params.provider, "search");
+      const { name, provider } = lib.selectProvider(params.provider, "search", signal);
       const search = lib.requireOperation(provider, "search");
       return textResult(lib.formatTracks(name, params.query, await search(params.query, options)));
     },
@@ -164,13 +164,16 @@ export default function lyricsExtension(pi: ExtensionAPI): void {
         Type.String({ description: "Provider that serves synchronized lyrics", minLength: 1 }),
       ),
     }),
-    async execute(_toolCallId, params): Promise<LyricsToolResult> {
+    async execute(_toolCallId, params, signal): Promise<LyricsToolResult> {
       const lib = await loadLibrary();
       const query = { artist: params.artist, track: params.track, duration: params.duration };
       const syncedProviders = lib.usableProviders("synced");
       const lyrics = lib.providerArg(params.provider)
-        ? await lib.requireOperation(lib.selectProvider(params.provider).provider, "lyrics")(query)
-        : (await lib.lyricsWithFallback(query, syncedProviders)).lyrics;
+        ? await lib.requireOperation(
+            lib.selectProvider(params.provider, "lyrics", signal).provider,
+            "lyrics",
+          )(query)
+        : (await lib.lyricsWithFallback(query, syncedProviders, signal)).lyrics;
 
       if (!lyrics.synced) {
         return textResult(`No synchronized lyrics from ${lyrics.provider} for this track`);

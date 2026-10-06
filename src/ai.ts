@@ -38,11 +38,11 @@ export const searchTool: Tool<z.infer<typeof searchInputSchema>, SearchToolOutpu
   description:
     "Find tracks matching a free-form query, best match first. Pass provider 'all' to compare every provider.",
   inputSchema: searchInputSchema,
-  execute: async ({ query, limit, provider }) => {
+  execute: async ({ query, limit, provider }, { abortSignal }) => {
     if (isAllProviders(provider)) {
-      return { comparison: serializeOutcomes(await searchAll(query, { limit })) };
+      return { comparison: serializeOutcomes(await searchAll(query, { limit }, abortSignal)) };
     }
-    const selected = selectProvider(provider, "search");
+    const selected = selectProvider(provider, "search", abortSignal);
     const search = requireOperation(selected.provider, "search");
     return { provider: selected.name, matches: await search(query, { limit }) };
   },
@@ -65,16 +65,16 @@ export const lyricsTool: Tool<z.infer<typeof lyricsInputSchema>, LyricsToolOutpu
   description:
     "Fetch the lyrics of one track. Without a provider, providers are tried in order until one has the song. The result carries the source URL and attribution, which belong with any quotation of the text.",
   inputSchema: lyricsInputSchema,
-  execute: async ({ artist, track, album, duration, id, provider }) => {
+  execute: async ({ artist, track, album, duration, id, provider }, { abortSignal }) => {
     const query = { artist, track, album, duration, id };
     if (isAllProviders(provider)) {
-      return { comparison: serializeOutcomes(await lyricsAll(query)) };
+      return { comparison: serializeOutcomes(await lyricsAll(query, abortSignal)) };
     }
     if (!providerArg(provider)) {
-      const fallback = await lyricsWithFallback(query);
+      const fallback = await lyricsWithFallback(query, undefined, abortSignal);
       return { provider: fallback.provider, lyrics: fallback.lyrics, skipped: fallback.skipped };
     }
-    const selected = selectProvider(provider);
+    const selected = selectProvider(provider, "lyrics", abortSignal);
     const lyrics = requireOperation(selected.provider, "lyrics");
     return { provider: selected.name, lyrics: await lyrics(query) };
   },

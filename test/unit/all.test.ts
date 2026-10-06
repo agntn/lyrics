@@ -4,7 +4,7 @@ import { NotFoundError, RateLimitError } from "../../src/core/errors.ts";
 import { Provider, requireOperation } from "../../src/core/provider.ts";
 import type { Lyrics, ProviderCapabilities, TrackQuery } from "../../src/core/types.ts";
 import { create, register } from "../../src/core/registry.ts";
-import { FAKE_PLAIN, stubHTML, stubJSON } from "../helpers.ts";
+import { FAKE_PLAIN, stubHTML, stubJSON, stubPendingFetch } from "../helpers.ts";
 import { usableProviders } from "../../src/core/resolve.ts";
 import "../../src/providers/index.ts";
 
@@ -138,6 +138,67 @@ describe("searchAll", () => {
     const lyricsovh = outcomes.find((outcome) => outcome.provider === "lyricsovh");
 
     expect(lyricsovh?.error?.message).toContain('Operation "search" not supported');
+  });
+});
+
+/** Reports any failed request as a miss, the way a provider outside this package might. */
+class MissOnFailure extends Provider {
+  static readonly key = "miss-on-failure";
+
+  get capabilities(): ProviderCapabilities {
+    return { search: false, lyrics: true, synced: false, translation: false };
+  }
+
+  async lyrics(query: TrackQuery): Promise<Lyrics> {
+    try {
+      return await this.getJSON<Lyrics>("https://example.com/lyrics");
+    } catch {
+      throw new NotFoundError(`${query.artist} - ${query.track}`, MissOnFailure.key);
+    }
+  }
+}
+
+describe("cancellation", () => {
+  it("stops a fallback walk at the provider it reached", async () => {
+    const signals = stubPendingFetch();
+    const controller = new AbortController();
+
+    const pending = lyricsWithFallback(QUERY, ["lrclib", "lyricsovh"], controller.signal);
+    await vi.waitFor(() => expect(signals).toHaveLength(1));
+    controller.abort();
+
+    await expect(pending).rejects.toThrow();
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(true);
+  });
+
+  it("does not walk on when an aborted request comes back as a miss", async () => {
+    register(MissOnFailure);
+    const signals = stubPendingFetch();
+    const controller = new AbortController();
+
+    const pending = lyricsWithFallback(QUERY, ["miss-on-failure", "lrclib"], controller.signal);
+    await vi.waitFor(() => expect(signals).toHaveLength(1));
+    controller.abort();
+
+    await expect(pending).rejects.toThrow(NotFoundError);
+    expect(signals).toHaveLength(1);
+  });
+
+  it.each([
+    ["lyricsAll", (signal: AbortSignal) => lyricsAll(QUERY, signal)],
+    ["searchAll", (signal: AbortSignal) => searchAll("placeholder", {}, signal)],
+  ])("cancels every request of %s", async (_name, run) => {
+    const signals = stubPendingFetch();
+    const controller = new AbortController();
+
+    const pending = run(controller.signal);
+    await vi.waitFor(() => expect(signals.length).toBeGreaterThan(1));
+    controller.abort();
+    const outcomes = await pending;
+
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    expect(outcomes.some((outcome) => outcome.error)).toBe(true);
   });
 });
 

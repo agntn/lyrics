@@ -8,9 +8,11 @@ import {
   usableProviders,
 } from "../../src/core/resolve.ts";
 import "../../src/providers/index.ts";
+import { stubPendingFetch } from "../helpers.ts";
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 describe("resolveProvider", () => {
@@ -66,6 +68,19 @@ describe("selectProvider", () => {
 
   it("rejects an unknown explicit provider", () => {
     expect(() => selectProvider("missing")).toThrow(UnknownProviderError);
+  });
+
+  it("hands the caller's signal to every request of the provider", async () => {
+    const signals = stubPendingFetch();
+    const controller = new AbortController();
+    const { provider } = selectProvider("lrclib", "lyrics", controller.signal);
+
+    const pending = provider.lyrics({ artist: "Placeholder Artist", track: "Placeholder Song" });
+    await vi.waitFor(() => expect(signals).toHaveLength(1));
+    controller.abort();
+
+    await expect(pending).rejects.toThrow();
+    expect(signals[0]?.aborted).toBe(true);
   });
 });
 
