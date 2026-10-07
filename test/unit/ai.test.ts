@@ -1,34 +1,62 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { lyricsTool, searchTool } from "../../src/ai.ts";
-import { stubPendingFetch } from "../helpers.ts";
+import { lineAtTool, lyricsTool, providersTool, searchTool } from "../../src/ai.ts";
+import { register } from "../../src/core/registry.ts";
+import "../../src/providers/index.ts";
+import { AttributedProvider, NETWORKED_CALLS, stubPendingFetch } from "../helpers.ts";
+
+const callOptions = { toolCallId: "call-1", messages: [], context: undefined };
+
+const AI_TOOLS: Record<string, { execute?: unknown }> = {
+  lyrics_get: lyricsTool,
+  lyrics_search: searchTool,
+  lyrics_line_at: lineAtTool,
+};
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe("AI SDK tools", () => {
-  it.each([
-    [lyricsTool, { artist: "a", track: "b" }],
-    [lyricsTool, { artist: "a", track: "b", provider: "lrclib" }],
-    [lyricsTool, { artist: "a", track: "b", provider: "all" }],
-    [searchTool, { query: "placeholder", provider: "lrclib" }],
-    [searchTool, { query: "placeholder", provider: "all" }],
-  ] as const)("cancels the requests of call %# with the abort signal", async (tool, input) => {
-    const signals = stubPendingFetch();
-    const controller = new AbortController();
+  it("hands back the data next to the text every host prints", async () => {
+    register(AttributedProvider);
+    vi.stubGlobal("fetch", vi.fn());
 
-    const pending = (tool.execute as (input: unknown, options: unknown) => Promise<unknown>)(
-      input,
-      {
-        toolCallId: "call-1",
-        messages: [],
-        abortSignal: controller.signal,
-      },
+    const result = await lyricsTool.execute?.(
+      { artist: "a", track: "b", provider: "attributed" },
+      callOptions,
     );
-    await vi.waitFor(() => expect(signals.length).toBeGreaterThan(0));
-    controller.abort();
 
-    await pending.catch(() => undefined);
-    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    expect(result).toMatchObject({
+      provider: "attributed",
+      lyrics: { url: "https://example.com/placeholder" },
+      text: expect.stringContaining("Source: https://example.com/placeholder"),
+    });
   });
+
+  it("lists every provider with its capabilities", async () => {
+    const result = await providersTool.execute?.({}, callOptions);
+
+    expect(result).toMatchObject({
+      providers: expect.arrayContaining([expect.objectContaining({ name: "lrclib" })]),
+    });
+  });
+
+  it.each(NETWORKED_CALLS)(
+    "cancels the requests of %s %j with the abort signal",
+    async (name, input) => {
+      const signals = stubPendingFetch();
+      const controller = new AbortController();
+      const execute = AI_TOOLS[name]?.execute as (
+        input: unknown,
+        options: unknown,
+      ) => Promise<unknown>;
+
+      const pending = execute(input, { ...callOptions, abortSignal: controller.signal });
+      await vi.waitFor(() => expect(signals.length).toBeGreaterThan(0));
+      controller.abort();
+
+      await pending.catch(() => undefined);
+      expect(signals.every((signal) => signal.aborted)).toBe(true);
+    },
+  );
 });

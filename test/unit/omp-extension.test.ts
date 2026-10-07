@@ -1,194 +1,203 @@
-import * as TypeBox from "@oh-my-pi/omptype/typebox";
-import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@oh-my-pi/pi-coding-agent";
+import { ToolInputError, wireSchema } from "@agntn/tools";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  Theme,
+  ToolDefinition,
+} from "@oh-my-pi/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-/**
- * The host serves these modules to loaded extensions at runtime; under vitest the renderers are
- * exercised against capturing stand-ins instead of the OMP TUI.
- */
-vi.mock("@oh-my-pi/pi-coding-agent", () => ({
-  Text: class {
-    constructor(
-      readonly text: string,
-      readonly paddingX?: number,
-      readonly paddingY?: number,
-    ) {}
-  },
-}));
-vi.mock("@oh-my-pi/pi-coding-agent/tui", () => ({
-  renderStatusLine: (options: unknown) => JSON.stringify(options),
-}));
+/** Compiled OMP gives an extension only the package root, so loading the TUI barrel has to fail. */
+vi.mock("@oh-my-pi/pi-coding-agent/tui", () => {
+  throw new Error("The OMP host does not inject the TUI barrel");
+});
 
+import lyricsOmpExtension from "../../packages/omp/extensions/lyrics.ts";
+import { register } from "../../src/core/registry.ts";
+import "../../src/providers/index.ts";
+import { lyricsTools } from "../../src/tools.ts";
 import {
   AttributedProvider,
   LRCLIB_TRACK,
+  NETWORKED_CALLS,
   requireTool,
   stubJSON,
   stubPendingFetch,
 } from "../helpers.ts";
-import { register } from "../../src/core/registry.ts";
-import lyricsOmpExtension, { sanitizeTerminalText } from "../../packages/omp/extensions/lyrics.ts";
+
+/** Stands in for the host `Text`, keeping the drawn line for the assertion. */
+class CapturedText {
+  readonly text: string;
+
+  constructor(text: string) {
+    this.text = text;
+  }
+}
+
+/** The host build wraps the JSON Schema in `Type.Unsafe` and emits it verbatim. */
+const hostTypebox = {
+  Type: { Unsafe: (schema: unknown) => schema },
+} as unknown as ExtensionAPI["typebox"];
+
+/** A host double that throws on any member the extension was not expected to read. */
+function strictDouble<T extends object>(name: string, stubs: Partial<T>): T {
+  return new Proxy(stubs, {
+    get(target, key, receiver) {
+      if (typeof key === "symbol" || key === "then" || Reflect.has(target, key)) {
+        return Reflect.get(target, key, receiver);
+      }
+      throw new Error(`${name}.${String(key)} is not stubbed in the OMP test host`);
+    },
+  }) as T;
+}
 
 interface RegisteredExtension {
-  label: string | undefined;
+  labels: string[];
   tools: Map<string, ToolDefinition>;
 }
 
-/** SAFETY: the test host implements the three registration-time capabilities the extension uses. */
-function registerExtensionTools(): RegisteredExtension {
+async function registerExtensionTools(): Promise<RegisteredExtension> {
   const tools = new Map<string, ToolDefinition>();
-  let label: string | undefined;
-  const api = {
-    typebox: TypeBox,
-    setLabel(value: string) {
-      label = value;
-    },
-    registerTool(tool: ToolDefinition) {
-      tools.set(tool.name, tool);
-    },
-  };
-
-  lyricsOmpExtension(api as unknown as ExtensionAPI);
-  return { label, tools };
+  const labels: string[] = [];
+  await lyricsOmpExtension(
+    strictDouble<ExtensionAPI>("ExtensionAPI", {
+      typebox: hostTypebox,
+      pi: strictDouble<ExtensionAPI["pi"]>("ExtensionAPI.pi", {
+        Text: CapturedText as unknown as ExtensionAPI["pi"]["Text"],
+      }),
+      setLabel(label) {
+        labels.push(label);
+      },
+      registerTool(tool) {
+        tools.set(tool.name, tool as ToolDefinition);
+      },
+    }),
+  );
+  return { labels, tools };
 }
 
-/** SAFETY: the test host injects OMP's TypeBox facade, which creates this schema. */
-function accepts(tool: ToolDefinition, value: unknown): boolean {
-  return (tool.parameters as unknown as TypeBox.TSchema).safeParse(value).success;
-}
+/** Writes its styling calls into the output, so a test sees what went where. */
+const theme = strictDouble<Theme>("Theme", {
+  fg: (color, text) => `${color}(${text})`,
+  styledSymbol: (symbol, color) => `${color}:${symbol}`,
+  spinnerFrames: ["frame-0", "frame-1"],
+  format: strictDouble<Theme["format"]>("Theme.format", { bracketLeft: "[", bracketRight: "]" }),
+  sep: strictDouble<Theme["sep"]>("Theme.sep", { dot: " | " }),
+});
 
 /** SAFETY: the tested execute functions do not read ExtensionContext. */
 const unusedContext = {} as ExtensionContext;
 
-const TRACK = LRCLIB_TRACK;
+async function run(name: string, params: unknown, signal?: AbortSignal) {
+  const tool = requireTool((await registerExtensionTools()).tools, name);
+  return tool.execute("test", params as never, signal, undefined, unusedContext);
+}
+
+async function text(name: string, params: unknown): Promise<string> {
+  return ((await run(name, params)).content[0] as { text: string }).text;
+}
+
+async function statusLine(name: string, args: Record<string, unknown>): Promise<string> {
+  const tool = requireTool((await registerExtensionTools()).tools, name);
+  const drawn = tool.renderCall?.(args as never, { expanded: false, isPartial: false }, theme);
+  return (drawn as unknown as CapturedText).text;
+}
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe("lyrics OMP extension", () => {
-  it("registers the complete read-only tool set under an extension label", () => {
-    const { label, tools } = registerExtensionTools();
+  it("registers the complete read-only tool set under an extension label", async () => {
+    const { labels, tools } = await registerExtensionTools();
 
-    expect(label).toBe("Lyrics");
+    expect(labels).toEqual(["Lyrics"]);
     expect([...tools.keys()]).toEqual([
-      "lyrics_get",
-      "lyrics_search",
-      "lyrics_line_at",
       "lyrics_providers",
+      "lyrics_search",
+      "lyrics_get",
+      "lyrics_line_at",
     ]);
-    for (const tool of tools.values()) expect(tool.approval).toBe("read");
+    for (const definition of lyricsTools) {
+      const tool = requireTool(tools, definition.name);
+      expect(tool.approval).toBe("read");
+      expect(tool.label).toBe(definition.title);
+      expect(tool.parameters).toEqual(wireSchema(definition));
+    }
   });
 
-  it("enforces the same argument bounds as the Pi extension", () => {
-    const { tools } = registerExtensionTools();
-    const get = requireTool(tools, "lyrics_get");
-    const search = requireTool(tools, "lyrics_search");
-
-    expect(accepts(get, { artist: "a", track: "b" })).toBe(true);
-    expect(accepts(get, { artist: "", track: "b" })).toBe(false);
-    expect(accepts(search, { query: "x", limit: 51 })).toBe(false);
-    expect(accepts(search, { query: "x", limit: 1.5 })).toBe(false);
+  it("enforces the same argument bounds as the Pi extension", async () => {
+    await expect(run("lyrics_get", { artist: "", track: "b" })).rejects.toThrow(ToolInputError);
+    await expect(run("lyrics_search", { query: "x", limit: 51 })).rejects.toThrow("/limit");
+    await expect(run("lyrics_search", { query: "x", limit: 1.5 })).rejects.toThrow("/limit");
   });
 
-  it("renders a status line for each call", () => {
-    const { tools } = registerExtensionTools();
-    const tool = requireTool(tools, "lyrics_get");
-
-    const rendered = tool.renderCall?.(
-      { artist: "Placeholder Artist", track: "Placeholder Song" },
-      { expanded: false, isPartial: false },
-      undefined as never,
-    ) as unknown as { text: string };
-
-    expect(rendered.text).toContain("Placeholder Artist - Placeholder Song");
+  it("renders a status line for each call", async () => {
+    expect(
+      await statusLine("lyrics_get", { artist: "Placeholder Artist", track: "Placeholder Song" }),
+    ).toContain("Placeholder Artist - Placeholder Song");
+    expect(await statusLine("lyrics_line_at", { artist: "a", track: "b", seconds: 25 })).toContain(
+      "a - b @ 25s",
+    );
   });
 
-  it("strips terminal control sequences from rendered arguments", () => {
+  it("strips terminal control sequences from rendered arguments", async () => {
     const escape = String.fromCharCode(27);
     const nul = String.fromCharCode(0);
 
-    expect(sanitizeTerminalText(`${escape}[31mred${escape}[0m`)).toBe("red");
-    expect(sanitizeTerminalText(`a${nul}b`)).toBe("a b");
+    const line = await statusLine("lyrics_search", { query: `${escape}[31mred${escape}[0m${nul}` });
+
+    expect(line).toContain("red");
+    expect(line).not.toContain(escape);
+    expect(line).not.toContain(nul);
   });
 
   it("keeps line breaks in tool output while removing control bytes", async () => {
-    stubJSON(TRACK);
-    const { tools } = registerExtensionTools();
-    const tool = requireTool(tools, "lyrics_get");
+    const escape = String.fromCharCode(27);
+    stubJSON({ ...LRCLIB_TRACK, plainLyrics: `First ${escape}[2Jline\u0007\nSecond line` });
 
-    const result = await tool.execute?.(
-      "call-1",
-      { artist: "a", track: "b" },
-      undefined,
-      undefined,
-      unusedContext,
-    );
-    const text = String(
-      result?.content?.[0] && "text" in result.content[0] ? result.content[0].text : "",
-    );
+    const output = await text("lyrics_get", { artist: "a", track: "b" });
 
-    expect(text).toContain("First placeholder line\nSecond placeholder line");
-    expect(text).toContain("Source: https://lrclib.net/api/get/496");
+    expect(output).toContain("First line\nSecond line");
+    expect(output).not.toContain(escape);
+    expect(output).not.toContain("\u0007");
+    expect(output).toContain("Source: https://lrclib.net/api/get/496");
   });
 
   it("keeps attribution with a fetched line", async () => {
     register(AttributedProvider);
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
-    const tool = requireTool(registerExtensionTools().tools, "lyrics_line_at");
 
-    const result = await tool.execute?.(
-      "attributed-line",
-      {
-        artist: "Placeholder Artist",
-        track: "Placeholder Song",
-        seconds: 25,
-        provider: "attributed",
-      },
-      undefined,
-      undefined,
-      unusedContext,
+    const output = await text("lyrics_line_at", {
+      artist: "Placeholder Artist",
+      track: "Placeholder Song",
+      seconds: 25,
+      provider: "attributed",
+    });
+
+    expect(output).toBe(
+      "[0:20] Second placeholder line\n\nSource: https://example.com/placeholder\nPlaceholder attribution",
     );
-
-    expect(result?.content).toEqual([
-      {
-        type: "text",
-        text: "[0:20] Second placeholder line\n\nSource: https://example.com/placeholder\nPlaceholder attribution",
-      },
-    ]);
-    expect(result?.details).toBeUndefined();
     expect(fetch).not.toHaveBeenCalled();
   });
 
   it("lists providers through the shared formatter", async () => {
-    const { tools } = registerExtensionTools();
-    const tool = requireTool(tools, "lyrics_providers");
-
-    const result = await tool.execute?.("call-2", {}, undefined, undefined, unusedContext);
-
-    expect(result?.content?.[0]).toMatchObject({
-      type: "text",
-      text: expect.stringContaining("lrclib: search, lyrics, synced"),
-    });
+    expect(await text("lyrics_providers", {})).toContain("lrclib: search, lyrics, synced");
   });
 
-  it.each([
-    ["lyrics_get", { artist: "a", track: "b" }],
-    ["lyrics_get", { artist: "a", track: "b", provider: "lrclib" }],
-    ["lyrics_search", { query: "placeholder", provider: "lrclib" }],
-    ["lyrics_search", { query: "placeholder", provider: "all" }],
-    ["lyrics_line_at", { artist: "a", track: "b", seconds: 20 }],
-  ])("cancels the requests of %s %j with the host signal", async (name, params) => {
-    const signals = stubPendingFetch();
-    const tool = requireTool(registerExtensionTools().tools, name);
-    const controller = new AbortController();
+  it.each(NETWORKED_CALLS)(
+    "cancels the requests of %s %j with the host signal",
+    async (name, params) => {
+      const signals = stubPendingFetch();
+      const controller = new AbortController();
 
-    const pending = tool.execute?.("call-4", params, controller.signal, undefined, unusedContext);
-    await vi.waitFor(() => expect(signals.length).toBeGreaterThan(0));
-    controller.abort();
+      const pending = run(name, params, controller.signal);
+      await vi.waitFor(() => expect(signals.length).toBeGreaterThan(0));
+      controller.abort();
 
-    await pending?.catch(() => undefined);
-    expect(signals.every((signal) => signal.aborted)).toBe(true);
-  });
+      await pending.catch(() => undefined);
+      expect(signals.every((signal) => signal.aborted)).toBe(true);
+    },
+  );
 });

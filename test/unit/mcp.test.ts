@@ -1,5 +1,4 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import pkg from "../../package.json" with { type: "json" };
 import { Provider } from "../../src/core/provider.ts";
@@ -7,7 +6,15 @@ import type { ProviderConstructor } from "../../src/core/provider.ts";
 import { create, getDefaultURL, register } from "../../src/core/registry.ts";
 import type { ProviderCapabilities } from "../../src/core/types.ts";
 import { createMcpServer } from "../../src/mcp.ts";
-import { FAKE_PLAIN, FAKE_SYNCED, LRCLIB_TRACK, stubJSON, stubPendingFetch } from "../helpers.ts";
+import { lyricsTools } from "../../src/tools.ts";
+import "../../src/providers/index.ts";
+import {
+  AttributedProvider,
+  LRCLIB_TRACK,
+  NETWORKED_CALLS,
+  stubJSON,
+  stubPendingFetch,
+} from "../helpers.ts";
 
 const openConnections: Array<{ close(): Promise<void> }> = [];
 
@@ -30,6 +37,24 @@ async function connectTestClient(): Promise<Client> {
   openConnections.push(client, server);
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
   return client;
+}
+
+async function call(name: string, args: Record<string, unknown>) {
+  return (await connectTestClient()).callTool({ name, arguments: args });
+}
+
+/** The text of a call that has to succeed. */
+function answer(response: unknown): string {
+  const { content, isError } = response as { content: Array<{ text: string }>; isError?: boolean };
+  expect(isError).not.toBe(true);
+  return content[0]?.text ?? "";
+}
+
+/** The text of a call that has to fail. */
+function failure(response: unknown): string {
+  const { content, isError } = response as { content: Array<{ text: string }>; isError?: boolean };
+  expect(isError).toBe(true);
+  return content[0]?.text ?? "";
 }
 
 /** Takes over the lrclib key while claiming operations it refuses to serve. */
@@ -56,149 +81,124 @@ describe("Lyrics MCP server", () => {
       "lyrics_get",
       "lyrics_line_at",
     ]);
+    for (const tool of listed.tools) {
+      const definition = lyricsTools.find((entry) => entry.name === tool.name);
+      expect(tool.annotations?.title).toBe(definition?.title);
+      expect(tool.annotations?.readOnlyHint).toBe(true);
+    }
 
     const response = await client.callTool({ name: "lyrics_providers", arguments: {} });
-    expect(response.isError).not.toBe(true);
-    expect(response.content).toEqual([
-      { type: "text", text: expect.stringContaining('"name": "lrclib"') },
-    ]);
+    expect(answer(response)).toContain("lrclib: search, lyrics, synced");
   });
 
   it("introduces itself with the version that is actually installed", async () => {
     const client = await connectTestClient();
 
-    expect(client.getServerVersion()).toEqual({ name: "lyrics", version: pkg.version });
+    expect(client.getServerVersion()).toMatchObject({ name: "lyrics", version: pkg.version });
   });
 
   it("fetches lyrics from an explicitly chosen provider", async () => {
     stubJSON(TRACK);
-    const client = await connectTestClient();
 
-    const response = await client.callTool({
-      name: "lyrics_get",
-      arguments: { artist: "Placeholder Artist", track: "Placeholder Song", provider: "lrclib" },
-    });
+    const text = answer(
+      await call("lyrics_get", {
+        artist: "Placeholder Artist",
+        track: "Placeholder Song",
+        provider: "lrclib",
+      }),
+    );
 
-    expect(response.isError).not.toBe(true);
-    expect(response.content).toEqual([
-      { type: "text", text: expect.stringMatching(/"provider": "lrclib"[\s\S]*First placeholder/) },
-    ]);
+    expect(text).toMatch(/^\[lrclib\] Placeholder Artist - Placeholder Song/);
+    expect(text).toContain("First placeholder line");
+    expect(text).toContain("Source: https://lrclib.net/api/get/496");
   });
 
-  it("walks providers and reports the ones it passed over", async () => {
+  it("walks providers and names the one that had the song", async () => {
     stubJSON(TRACK);
-    const client = await connectTestClient();
 
-    const response = await client.callTool({
-      name: "lyrics_get",
-      arguments: { artist: "Placeholder Artist", track: "Placeholder Song" },
-    });
+    const text = answer(
+      await call("lyrics_get", { artist: "Placeholder Artist", track: "Placeholder Song" }),
+    );
 
-    expect(response.isError).not.toBe(true);
-    expect(response.content).toEqual([
-      { type: "text", text: expect.stringMatching(/"provider": "lrclib"[\s\S]*"skipped": \[\]/) },
-    ]);
+    expect(text).toMatch(/^\[lrclib\]/);
+    expect(text).not.toContain("skipped");
   });
 
   it("compares every provider when provider is 'all'", async () => {
     stubJSON(TRACK);
-    const client = await connectTestClient();
 
-    const response = await client.callTool({
-      name: "lyrics_get",
-      arguments: { artist: "a", track: "b", provider: "all" },
-    });
+    const text = answer(await call("lyrics_get", { artist: "a", track: "b", provider: "all" }));
 
-    expect(response.isError).not.toBe(true);
-    expect(response.content).toEqual([
-      {
-        type: "text",
-        text: expect.stringMatching(/"provider": "lrclib"[\s\S]*"provider": "musixmatch"/),
-      },
-    ]);
+    expect(text).toMatch(/\[lrclib\][\s\S]*\[musixmatch\] error:/);
   });
 
-  it("reads a synced line locally without contacting a provider", async () => {
-    const fetch = stubJSON(TRACK);
-    const client = await connectTestClient();
+  it("serves synced lyrics and translations it used to leave to Pi and OMP", async () => {
+    register(AttributedProvider);
+    vi.stubGlobal("fetch", vi.fn());
+    const args = { artist: "a", track: "b", provider: "attributed" };
 
-    const response = await client.callTool({
-      name: "lyrics_line_at",
-      arguments: { lrc: FAKE_SYNCED, seconds: 25 },
-    });
+    expect(answer(await call("lyrics_get", { ...args, synced: true }))).toContain(
+      "[00:20.50] Second placeholder line",
+    );
+    expect(answer(await call("lyrics_get", { ...args, translation: true }))).toContain(
+      "Translated placeholder line",
+    );
+  });
 
-    expect(response.isError).not.toBe(true);
-    expect(response.content).toEqual([
-      { type: "text", text: expect.stringMatching(/"time": 20.5[\s\S]*"totalLines": 3/) },
-    ]);
-    expect(fetch).not.toHaveBeenCalled();
+  it("reads the line sung at a moment, with its source", async () => {
+    stubJSON(TRACK);
+
+    const text = answer(
+      await call("lyrics_line_at", { artist: "a", track: "b", seconds: 25, provider: "lrclib" }),
+    );
+
+    expect(text).toBe("[0:20] Second placeholder line\n\nSource: https://lrclib.net/api/get/496");
   });
 
   it("rejects a negative offset at the schema boundary", async () => {
-    const client = await connectTestClient();
+    const fetch = stubJSON(TRACK);
 
-    const response = await client.callTool({
-      name: "lyrics_line_at",
-      arguments: { lrc: FAKE_SYNCED, seconds: -1 },
-    });
-
-    expect(response.isError).toBe(true);
+    expect(
+      failure(await call("lyrics_line_at", { artist: "a", track: "b", seconds: -1 })),
+    ).toContain("seconds");
+    expect(fetch).not.toHaveBeenCalled();
   });
 
-  it.each(["", "   "])("rejects an empty-like provider instead of guessing", async (provider) => {
-    const client = await connectTestClient();
-
-    const response = await client.callTool({
-      name: "lyrics_search",
-      arguments: { query: "placeholder", provider },
-    });
-
-    expect(response.isError).toBe(true);
-  });
+  it.each(["", "   "])(
+    "rejects an empty-like provider %j instead of guessing",
+    async (provider) => {
+      expect(failure(await call("lyrics_search", { query: "placeholder", provider }))).toContain(
+        "provider",
+      );
+    },
+  );
 
   it("rejects an empty artist at the schema boundary", async () => {
-    const client = await connectTestClient();
+    expect(
+      failure(await call("lyrics_get", { artist: "   ", track: "b", provider: "lrclib" })),
+    ).toContain("artist");
+  });
 
-    const response = await client.callTool({
-      name: "lyrics_get",
-      arguments: { artist: "   ", track: "b", provider: "lrclib" },
-    });
-
-    expect(response.isError).toBe(true);
+  it("names an argument the tool does not take", async () => {
+    expect(
+      failure(await call("lyrics_search", { query: "placeholder", providers: "lrclib" })),
+    ).toContain("providers");
   });
 
   it("honors a disabled capability", async () => {
     register(DisabledProvider);
-    const client = await connectTestClient();
 
-    const response = await client.callTool({
-      name: "lyrics_get",
-      arguments: { artist: "a", track: "b", provider: "lrclib" },
-    });
-
-    expect(response.isError).toBe(true);
-    expect(response.content).toEqual([
-      {
-        type: "text",
-        text: expect.stringContaining('Operation "lyrics" not supported by lrclib'),
-      },
-    ]);
+    expect(
+      failure(await call("lyrics_get", { artist: "a", track: "b", provider: "lrclib" })),
+    ).toContain('Operation "lyrics" not supported by lrclib');
   });
 
-  it.each([
-    ["lyrics_get", { artist: "a", track: "b" }],
-    ["lyrics_get", { artist: "a", track: "b", provider: "lrclib" }],
-    ["lyrics_get", { artist: "a", track: "b", provider: "all" }],
-    ["lyrics_search", { query: "placeholder", provider: "lrclib" }],
-    ["lyrics_search", { query: "placeholder", provider: "all" }],
-  ])("cancels the requests of %s %j with the call", async (name, args) => {
+  it.each(NETWORKED_CALLS)("cancels the requests of %s %j with the call", async (name, args) => {
     const signals = stubPendingFetch();
     const client = await connectTestClient();
     const controller = new AbortController();
 
-    const pending = client.callTool({ name, arguments: args }, undefined, {
-      signal: controller.signal,
-    });
+    const pending = client.callTool({ name, arguments: args }, { signal: controller.signal });
     await vi.waitFor(() => expect(signals.length).toBeGreaterThan(0));
     controller.abort();
 

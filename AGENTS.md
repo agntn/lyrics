@@ -46,8 +46,11 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 - Every `Lyrics` carries `provider`, `url` and `attribution`, and `formatLyrics()` prints the last two under the text. Do not add a surface that drops them
 - Internal imports use explicit `.ts` extensions (nodenext + `allowImportingTsExtensions`); `erasableSyntaxOnly` forbids parameter properties
 - Provider registration is a class side effect: importing `src/providers/index.ts` triggers all `register()` calls - because of that, `package.json` must NOT declare `sideEffects: false`
-- One obuild bundle with four inputs (`index`, `cli`, `mcp`, `ai`) so every entry shares the chunk holding the registry
-- Cancellation rides on `ProviderConfig.signal`: the base `Provider` adds it to every request, `selectProvider()` and the fan-out helpers in `core/all.ts` take it as their last argument, and every agent surface hands over its host's signal (MCP `extra.signal`, AI SDK `abortSignal`, the third `execute` argument in Pi and OMP). An aborted fallback walk stops at the provider it reached, whatever that provider threw
+- One obuild bundle with five inputs (`index`, `cli`, `mcp`, `ai`, `tools`) so every entry shares the chunk holding the registry
+- Tools come from `@agntn/tools`: one `defineTool` per tool in `src/tools.ts`, handed to MCP (`createMcpServer`), Pi (`registerPiTools`), OMP (`registerOmpTools`), the AI SDK (`toAiTool`) and the CLI (`runCli`). Schemas use `Type` from `@agntn/tools`, never a bare `typebox` import, which OMP rewrites to its own facade. Validation lives in that core, so every surface rejects the same input before an executor runs
+- Executors in `src/tool-operations.ts` load behind a cached dynamic import, so the extensions register tools without loading the providers. Each one returns the formatter text every host prints and the data as `details`; MCP sends only the text, the AI SDK gets `{ ...details, text }`, the CLI prints `details` with `--json`. Provider text goes through `answer()`, which keeps line breaks and strips escapes, C0/C1 controls and bidi marks. Caller text (query, artist, track, provider) goes through `sanitizeLine` from `@agntn/tools` first: it comes back in headers and errors, and since MCP gets text instead of JSON, a newline in it would forge a line of the reply
+- `lyrics_line_at` fetches the synced lyrics itself and returns one line with its source, on every surface. A whole LRC never has to pass through the model to read one line
+- Cancellation rides on `ProviderConfig.signal`: the base `Provider` adds it to every request, `selectProvider()` and the fan-out helpers in `core/all.ts` take it as their last argument, and every agent surface hands over its host's signal (the `@agntn/tools` adapters pass it to executors as `context.signal`). An aborted fallback walk stops at the provider it reached, whatever that provider threw
 - `selectProvider()` in `core/resolve.ts` is the single selection path for the CLI, MCP, AI tools and both extensions; empty or whitespace-only arguments count as absent. The value `all` is reserved and tested with `isAllProviders()` before selection
 
 ## Key files
@@ -59,17 +62,15 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 - `src/core/errors.ts` - error hierarchy + `normalizeError` + URL sanitization
 - `src/core/registry.ts` - self-registering registry (register, create, providers, has, getEnvKey, supportsOperation, listProviders)
 - `src/core/resolve.ts` - capability-aware selection: `usableProviders`, `providerArg`, `selectProvider`, `isAllProviders`; `isConfigured` lives in the registry and is re-exported here
-- `src/commands/args.ts` - `parseNumericArg`, because citty has no numeric argument type and four commands were each validating their own
 - `src/core/all.ts` - `searchAll`, `lyricsAll`, `lyricsWithFallback`, `serializeOutcomes`
 - `src/core/format.ts` - plain-text formatters shared by every output surface
-- `src/core/schemas.ts` - zod input fragments shared by the MCP server and the AI tools
 - `src/core/client.ts` - native `fetch` wrapper: `getJSON` parses the body whatever its content type, `getText` keeps HTML a string; 15 s timeout joined with the caller's `signal`, no retry, identifying User-Agent. A 4xx or 5xx becomes a `ResponseError`, which `normalizeError()` classifies before it leaves the client
 - `src/providers/*.ts` - one file per provider, self-registering via `register()`; order in `index.ts` is the fallback order
-- `src/mcp.ts` - `createMcpServer()`, four read-only tools (`lyrics_line_at` is local)
-- `src/commands/mcp.ts` - imports the SDK inside `run()`, not at module scope: citty resolves every lazy subcommand to read its `meta`, so a top-level import puts the MCP SDK into the startup path of `lyrics --help` and every other command
+- `src/tools.ts` - the tool definitions and `loadOperations()`; `src/tool-operations.ts` - their executors
+- `src/mcp.ts` - `createMcpServer()` over the same read-only tools
 - `src/ai.ts` - Vercel AI SDK tool surface
-- `src/cli.ts` + `src/commands/*.ts` - citty CLI with lazy subcommands. A closed stdout or stderr (`| head -1`) ends the process through an `EPIPE` listener and keeps the exit code
-- `packages/pi/extensions/lyrics.ts`, `packages/omp/extensions/lyrics.ts` - agent extensions; type-import from `dist/index.d.mts`. The OMP loader keeps both dynamic imports literal: `existsSync(src)` chooses `import("../../../src/index.ts")` or `import("../../../dist/index.mjs")`. An `import(url.href)` loses dependency resolution in the compiled binary
+- `src/cli.ts` - `runCli` builds one command per tool, plus `mcp`. `src/cli-commands.ts` holds `synced`, a CLI-only command over the same executors. `runCli` in `@agntn/tools` 0.2.0 reads long flags only, so `-p`, `-n` and the other short aliases are gone until a release with the `short` hint
+- `packages/pi/extensions/lyrics.ts`, `packages/omp/extensions/lyrics.ts` - agent extensions; they load the tool list from `src/tools.ts` in a checkout and `dist/tools.mjs` in the package. The OMP loader keeps both dynamic imports literal: `existsSync(src)` chooses `import("../../../src/tools.ts")` or `import("../../../dist/tools.mjs")`. OMP gets its `Text` from `pi.pi.Text`; no import from `@oh-my-pi/pi-coding-agent/tui`, which compiled OMP doesn't hand to extensions and which took the whole extension down before. An `import(url.href)` loses dependency resolution in the compiled binary
 
 ## Constraints
 
@@ -84,7 +85,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 
 ## Testing
 
-`pnpm test` (vitest, 20 files / 268 tests, mocked via `vi.stubGlobal("fetch", ...)`; `client.test.ts` also runs the client against a loopback `node:http` server).
+`pnpm test` (vitest, 20 files / 286 tests, mocked via `vi.stubGlobal("fetch", ...)`; `client.test.ts` also runs the client against a loopback `node:http` server).
 
 Packed-layout gate (manual): `pnpm pack`, install the tarball with `npm install --legacy-peer-deps` in an empty dir, register a custom provider through the main entry and confirm `lyrics_providers` from `@agntn/lyrics/mcp` lists it - this catches registry chunk splits, missing deps and broken `files`.
 
@@ -93,7 +94,7 @@ Pi 1.x: the Pi peer runs `>=0.84.2 <2` and the dev pin sits on 1.0.2, so `tsc` c
 ## Build & scripts
 
 ```bash
-pnpm build       # obuild → dist/ (one bundle: index, cli, mcp, ai)
+pnpm build       # obuild → dist/ (one bundle: index, cli, mcp, ai, tools)
 pnpm typecheck   # tsc → build → tsc -p tsconfig.extensions.json
 pnpm test        # vitest --run
 pnpm fmt         # oxlint --fix + oxfmt
