@@ -1,107 +1,38 @@
-/** Vercel AI SDK tool surface over the normalized lyrics operations. */
+/** Vercel AI SDK tool surface over the shared lyrics tool definitions. */
 
-import { tool, type Tool } from "ai";
-import { z } from "zod";
-import type { Lyrics, TrackMatch } from "./core/types.ts";
-import type { SerializedOutcome } from "./core/all.ts";
-import { lyricsAll, lyricsWithFallback, searchAll, serializeOutcomes } from "./core/all.ts";
-import { requireOperation } from "./core/provider.ts";
-import { providers } from "./core/registry.ts";
-import { isAllProviders, providerArg, selectProvider } from "./core/resolve.ts";
+import type { Static } from "@agntn/tools";
+import { toAiTool, type AiToolOutput } from "@agntn/tools/ai";
+import type { Tool } from "ai";
+import type {
+  LineAtDetails,
+  LyricsDetails,
+  ProvidersDetails,
+  SearchDetails,
+} from "./tool-operations.ts";
 import {
-  albumInput,
-  artistInput,
-  durationInput,
-  limitInput,
-  lrcInput,
-  providerInput,
-  queryInput,
-  secondsInput,
-  trackIdInput,
-  trackInput,
-} from "./core/schemas.ts";
-import { lineAt, parseLrc } from "./core/text.ts";
-import type { SyncedLine } from "./core/text.ts";
-import "./providers/index.ts";
+  getSchema,
+  getTool,
+  lineAtSchema,
+  lineAtTool as lineAtDefinition,
+  providersSchema,
+  providersTool as providersDefinition,
+  searchSchema,
+  searchTool as searchDefinition,
+} from "./tools.ts";
 
-const searchInputSchema = z.object({
-  query: queryInput,
-  limit: limitInput,
-  ...providerInput,
-});
+export const searchTool: Tool<Static<typeof searchSchema>, AiToolOutput<SearchDetails>> = toAiTool(
+  searchDefinition,
+);
 
-type SearchToolOutput =
-  | { provider: string; matches: TrackMatch[] }
-  | { comparison: SerializedOutcome<TrackMatch[]>[] };
+export const lyricsTool: Tool<Static<typeof getSchema>, AiToolOutput<LyricsDetails>> = toAiTool(
+  getTool,
+);
 
-export const searchTool: Tool<z.infer<typeof searchInputSchema>, SearchToolOutput> = tool({
-  description:
-    "Find tracks matching a free-form query, best match first. Pass provider 'all' to compare every provider.",
-  inputSchema: searchInputSchema,
-  execute: async ({ query, limit, provider }, { abortSignal }) => {
-    if (isAllProviders(provider)) {
-      return { comparison: serializeOutcomes(await searchAll(query, { limit }, abortSignal)) };
-    }
-    const selected = selectProvider(provider, "search", abortSignal);
-    const search = requireOperation(selected.provider, "search");
-    return { provider: selected.name, matches: await search(query, { limit }) };
-  },
-});
+export const lineAtTool: Tool<Static<typeof lineAtSchema>, AiToolOutput<LineAtDetails>> = toAiTool(
+  lineAtDefinition,
+);
 
-const lyricsInputSchema = z.object({
-  artist: artistInput,
-  track: trackInput,
-  album: albumInput,
-  duration: durationInput,
-  id: trackIdInput,
-  ...providerInput,
-});
-
-type LyricsToolOutput =
-  | { provider: string; lyrics: Lyrics; skipped?: { provider: string; error: string }[] }
-  | { comparison: SerializedOutcome<Lyrics>[] };
-
-export const lyricsTool: Tool<z.infer<typeof lyricsInputSchema>, LyricsToolOutput> = tool({
-  description:
-    "Fetch the lyrics of one track. Without a provider, providers are tried in order until one has the song. The result carries the source URL and attribution, which belong with any quotation of the text.",
-  inputSchema: lyricsInputSchema,
-  execute: async ({ artist, track, album, duration, id, provider }, { abortSignal }) => {
-    const query = { artist, track, album, duration, id };
-    if (isAllProviders(provider)) {
-      return { comparison: serializeOutcomes(await lyricsAll(query, abortSignal)) };
-    }
-    if (!providerArg(provider)) {
-      const fallback = await lyricsWithFallback(query, undefined, abortSignal);
-      return { provider: fallback.provider, lyrics: fallback.lyrics, skipped: fallback.skipped };
-    }
-    const selected = selectProvider(provider, "lyrics", abortSignal);
-    const lyrics = requireOperation(selected.provider, "lyrics");
-    return { provider: selected.name, lyrics: await lyrics(query) };
-  },
-});
-
-const lineAtInputSchema = z.object({
-  lrc: lrcInput,
-  seconds: secondsInput,
-});
-
-export const lineAtTool: Tool<
-  z.infer<typeof lineAtInputSchema>,
-  { seconds: number; line: SyncedLine | null; totalLines: number }
-> = tool({
-  description:
-    "Read the line playing at a given second out of synchronized LRC lyrics, computed locally on text already fetched.",
-  inputSchema: lineAtInputSchema,
-  execute: async ({ lrc, seconds }) => {
-    const lines = parseLrc(lrc);
-    return { seconds, line: lineAt(lines, seconds) ?? null, totalLines: lines.length };
-  },
-});
-
-export const providersTool: Tool<Record<string, never>, { providers: string[] }> = tool({
-  description: "List registered lyrics provider keys accepted by the other lyrics tools.",
-  inputSchema: z.object({}),
-  execute: async () => {
-    return { providers: providers() };
-  },
-});
+export const providersTool: Tool<
+  Static<typeof providersSchema>,
+  AiToolOutput<ProvidersDetails>
+> = toAiTool(providersDefinition);

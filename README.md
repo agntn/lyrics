@@ -23,13 +23,11 @@ Genius knows plenty about a song, but its API won't give you the lyrics. Other s
 
 ## 📦 Install
 
-Requires Node.js 24 or newer.
+Requires Node.js 26 or newer.
 
 ```bash
 pnpm add @agntn/lyrics
 ```
-
-The package is not published to npm yet. Registry install commands here are for use after publication. For now, use the checkout instructions under Development.
 
 ## 🚀 First call
 
@@ -50,7 +48,7 @@ Registered providers (6):
   azlyrics: lyrics
   musixmatch: search, lyrics [needs MUSIXMATCH_API_KEY]
 
-ℹ Use --provider <name> to select one, --provider all to compare every provider, or leave it out to walk providers until one has the song
+Pass a provider to choose one, provider 'all' to compare every provider, or leave it out to walk providers until one has the song.
 ```
 
 No key needed for this check. After installation, use `pnpm exec lyrics` for the commands below.
@@ -60,12 +58,13 @@ No key needed for this check. After installation, use `pnpm exec lyrics` for the
 | Command     | What you get                                      | Example                                               |
 | ----------- | ------------------------------------------------- | ----------------------------------------------------- |
 | `get`       | One track's lyrics                                | `pnpm exec lyrics get "Radiohead" "Creep"`            |
-| `search`    | Matching tracks                                   | `pnpm exec lyrics search "radiohead creep" -n 5`      |
+| `search`    | Matching tracks                                   | `pnpm exec lyrics search "radiohead creep" --limit 5` |
+| `line-at`   | The one line sung at a given second               | `pnpm exec lyrics line-at "Radiohead" "Creep" 45`     |
 | `synced`    | LRC, or the line at a given second                | `pnpm exec lyrics synced "Radiohead" "Creep" --at 45` |
 | `providers` | Provider capabilities and credential requirements | `pnpm exec lyrics providers`                          |
 | `mcp`       | MCP server over stdio                             | `pnpm exec lyrics mcp`                                |
 
-Want a translation? Try `pnpm exec lyrics get "Kult" "Arahja" -p tekstowo --translation`. Use `get --help`, `search --help` or `synced --help` for each command's options.
+Want a translation? Try `pnpm exec lyrics get "Kult" "Arahja" --provider tekstowo --translation`. Every command takes `--help`. Add `--json` and you get the data instead of the text. Flags are long for now, so `--provider`, not `-p`.
 
 `lyrics synced` prints a source footer after the LRC or selected line, including attribution when provided. Need just the LRC for a player? Use the library result's `synced` field.
 
@@ -112,7 +111,7 @@ See the [result types](./src/core/types.ts), [exports](./src/index.ts) and [LRC 
 | `azlyrics`   | None                                          |        |   ✓    |     |             |
 | `musixmatch` | `MUSIXMATCH_API_KEY`                          |   ✓    |   ✓    |     |             |
 
-`get` tries providers in registration order. `search` selects the first usable search provider. Pass `-p all` to either command for comparison, or name one provider to avoid fallback. Adding a key doesn't promote that provider. See the [provider implementations](./src/providers).
+`get` tries providers in registration order. `search` selects the first usable search provider. Pass `--provider all` to either command for comparison, or name one provider to avoid fallback. Adding a key doesn't promote that provider. See the [provider implementations](./src/providers).
 
 Genius can fetch lyrics without a token using an artist/title URL, but spelling differences can make that miss. Musixmatch's free plan returns an excerpt marked `partial: true`.
 
@@ -138,7 +137,7 @@ For an MCP client that accepts `mcpServers` configuration:
 }
 ```
 
-MCP and both extensions expose `lyrics_get`, `lyrics_search`, `lyrics_line_at` and `lyrics_providers`. The line lookup works locally on supplied LRC. Hit Esc and the request behind the tool stops too. No more sitting out a 15 second timeout for a song you already gave up on. Using Vercel AI SDK instead? Install the `ai` peer dependency and import tools from `@agntn/lyrics/ai`. See the [tool exports](./src/ai.ts) and [MCP server](./src/mcp.ts).
+MCP and both extensions expose `lyrics_get`, `lyrics_search`, `lyrics_line_at` and `lyrics_providers`. The line lookup grabs the timestamps itself and hands back one line with its source. Not the whole song. Hit Esc and the request behind the tool stops too. No more sitting out a 15 second timeout for a song you already gave up on. Using Vercel AI SDK instead? Install the `ai` peer dependency and import tools from `@agntn/lyrics/ai`. See the [tool exports](./src/ai.ts) and [MCP server](./src/mcp.ts).
 
 ## 🚫 Copyright still applies
 

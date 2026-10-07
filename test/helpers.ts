@@ -107,3 +107,13 @@ export function stubRoutes(
   vi.stubGlobal("fetch", fetch);
   return fetch;
 }
+
+/** Every call that reaches a provider, for the cancellation tests of each surface. */
+export const NETWORKED_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
+  ["lyrics_get", { artist: "a", track: "b" }],
+  ["lyrics_get", { artist: "a", track: "b", provider: "lrclib" }],
+  ["lyrics_get", { artist: "a", track: "b", provider: "all" }],
+  ["lyrics_search", { query: "placeholder", provider: "lrclib" }],
+  ["lyrics_search", { query: "placeholder", provider: "all" }],
+  ["lyrics_line_at", { artist: "a", track: "b", seconds: 20 }],
+];
