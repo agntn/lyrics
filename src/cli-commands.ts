@@ -35,6 +35,10 @@ export const syncedCommand = defineTool({
     },
     { additionalProperties: false },
   ),
-  cli: { command: "synced", positional: ["artist", "track"] },
+  cli: {
+    command: "synced",
+    positional: ["artist", "track"],
+    short: { provider: "p", duration: "d" },
+  },
   execute: async (params, { signal }) => (await loadOperations()).synced(params, signal),
 });

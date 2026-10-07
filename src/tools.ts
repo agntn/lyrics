@@ -95,7 +95,11 @@ export const searchTool = defineTool({
   effect: "read",
   openWorld: true,
   input: searchSchema,
-  cli: { description: "Search providers for tracks matching a query", positional: ["query"] },
+  cli: {
+    description: "Search providers for tracks matching a query",
+    rest: "query",
+    short: { provider: "p", limit: "n" },
+  },
   execute: async (params, { signal }) => (await loadOperations()).search(params, signal),
 });
 
@@ -141,7 +145,11 @@ export const getTool = defineTool({
   effect: "read",
   openWorld: true,
   input: getSchema,
-  cli: { description: "Fetch the lyrics of one track", positional: ["artist", "track"] },
+  cli: {
+    description: "Fetch the lyrics of one track",
+    positional: ["artist", "track"],
+    short: { provider: "p", duration: "d", synced: "s", translation: "t" },
+  },
   execute: async (params, { signal }) => (await loadOperations()).get(params, signal),
 });
 
@@ -172,6 +180,7 @@ export const lineAtTool = defineTool({
   cli: {
     description: "Print the line sung at a given second of a track",
     positional: ["artist", "track", "seconds"],
+    short: { provider: "p" },
   },
   execute: async (params, { signal }) => (await loadOperations()).lineAt(params, signal),
 });

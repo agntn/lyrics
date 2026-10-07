@@ -58,13 +58,13 @@ No key needed for this check. After installation, use `pnpm exec lyrics` for the
 | Command     | What you get                                      | Example                                               |
 | ----------- | ------------------------------------------------- | ----------------------------------------------------- |
 | `get`       | One track's lyrics                                | `pnpm exec lyrics get "Radiohead" "Creep"`            |
-| `search`    | Matching tracks                                   | `pnpm exec lyrics search "radiohead creep" --limit 5` |
+| `search`    | Matching tracks                                   | `pnpm exec lyrics search radiohead creep -n 5`        |
 | `line-at`   | The one line sung at a given second               | `pnpm exec lyrics line-at "Radiohead" "Creep" 45`     |
 | `synced`    | LRC, or the line at a given second                | `pnpm exec lyrics synced "Radiohead" "Creep" --at 45` |
 | `providers` | Provider capabilities and credential requirements | `pnpm exec lyrics providers`                          |
 | `mcp`       | MCP server over stdio                             | `pnpm exec lyrics mcp`                                |
 
-Want a translation? Try `pnpm exec lyrics get "Kult" "Arahja" --provider tekstowo --translation`. Every command takes `--help`. Add `--json` and you get the data instead of the text. Flags are long for now, so `--provider`, not `-p`.
+Want a translation? Try `pnpm exec lyrics get "Kult" "Arahja" --provider tekstowo --translation`. Every command takes `--help`. Add `--json` and you get the data instead of the text. The short flags are back: `-p` for the provider, `-n` for the limit. And `search` reads every word you give it, so `radiohead creep` needs no quotes. The old CLI quietly searched for `radiohead` alone.
 
 `lyrics synced` prints a source footer after the LRC or selected line, including attribution when provided. Need just the LRC for a player? Use the library result's `synced` field.
 

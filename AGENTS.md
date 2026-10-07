@@ -69,7 +69,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 - `src/tools.ts` - the tool definitions and `loadOperations()`; `src/tool-operations.ts` - their executors
 - `src/mcp.ts` - `createMcpServer()` over the same read-only tools
 - `src/ai.ts` - Vercel AI SDK tool surface
-- `src/cli.ts` - `runCli` builds one command per tool, plus `mcp`. `src/cli-commands.ts` holds `synced`, a CLI-only command over the same executors. `runCli` in `@agntn/tools` 0.2.0 reads long flags only, so `-p`, `-n` and the other short aliases are gone until a release with the `short` hint
+- `src/cli.ts` - `runCli` builds one command per tool, plus `mcp`. `src/cli-commands.ts` holds `synced`, a CLI-only command over the same executors. Short flags and the joined `search` query come from the `short` and `rest` hints on each definition, so a new option takes its letter there
 - `packages/pi/extensions/lyrics.ts`, `packages/omp/extensions/lyrics.ts` - agent extensions; they load the tool list from `src/tools.ts` in a checkout and `dist/tools.mjs` in the package. The OMP loader keeps both dynamic imports literal: `existsSync(src)` chooses `import("../../../src/tools.ts")` or `import("../../../dist/tools.mjs")`. OMP gets its `Text` from `pi.pi.Text`; no import from `@oh-my-pi/pi-coding-agent/tui`, which compiled OMP doesn't hand to extensions and which took the whole extension down before. An `import(url.href)` loses dependency resolution in the compiled binary
 
 ## Constraints
@@ -85,7 +85,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 
 ## Testing
 
-`pnpm test` (vitest, 20 files / 286 tests, mocked via `vi.stubGlobal("fetch", ...)`; `client.test.ts` also runs the client against a loopback `node:http` server).
+`pnpm test` (vitest, 20 files / 290 tests, mocked via `vi.stubGlobal("fetch", ...)`; `client.test.ts` also runs the client against a loopback `node:http` server).
 
 Packed-layout gate (manual): `pnpm pack`, install the tarball with `npm install --legacy-peer-deps` in an empty dir, register a custom provider through the main entry and confirm `lyrics_providers` from `@agntn/lyrics/mcp` lists it - this catches registry chunk splits, missing deps and broken `files`.
 
