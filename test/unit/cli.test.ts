@@ -1,7 +1,8 @@
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import pkg from "../../package.json" with { type: "json" };
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const CLI = fileURLToPath(new URL("../../src/cli.ts", import.meta.url));
@@ -24,5 +25,13 @@ async function runWithClosedStdout(...args: readonly string[]) {
 describe("cli", () => {
   it("lets the reader hang up mid song without a stack trace", async () => {
     await expect(runWithClosedStdout("providers")).resolves.toEqual({ code: 0, stderr: "" });
+  });
+
+  it("prints the version from package.json, not a stale copy", () => {
+    const stdout = execFileSync(process.execPath, [CLI, "--version"], {
+      cwd: ROOT,
+      encoding: "utf8",
+    });
+    expect(stdout.trim()).toBe(pkg.version);
   });
 });

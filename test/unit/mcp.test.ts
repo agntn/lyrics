@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import pkg from "../../package.json" with { type: "json" };
 import { Provider } from "../../src/core/provider.ts";
 import type { ProviderConstructor } from "../../src/core/provider.ts";
 import { create, getDefaultURL, register } from "../../src/core/registry.ts";
@@ -61,6 +62,12 @@ describe("Lyrics MCP server", () => {
     expect(response.content).toEqual([
       { type: "text", text: expect.stringContaining('"name": "lrclib"') },
     ]);
+  });
+
+  it("introduces itself with the version that is actually installed", async () => {
+    const client = await connectTestClient();
+
+    expect(client.getServerVersion()).toEqual({ name: "lyrics", version: pkg.version });
   });
 
   it("fetches lyrics from an explicitly chosen provider", async () => {
