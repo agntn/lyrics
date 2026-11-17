@@ -6,6 +6,8 @@ export default defineBuildConfig({
     {
       type: "bundle",
       input: ["./src/index.ts", "./src/cli.ts", "./src/mcp.ts", "./src/ai.ts", "./src/tools.ts"],
+      /** No maps: obuild's comment stripping knocks every one off its line. */
+      dts: { sourcemap: false },
     },
   ],
 });
