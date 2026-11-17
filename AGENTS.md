@@ -50,6 +50,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 - Tools come from `@agntn/tools`: one `defineTool` per tool in `src/tools.ts`, handed to MCP (`createMcpServer`), Pi (`registerPiTools`), OMP (`registerOmpTools`), the AI SDK (`toAiTool`) and the CLI (`runCli`). Schemas use `Type` from `@agntn/tools`, never a bare `typebox` import, which OMP rewrites to its own facade. Validation lives in that core, so every surface rejects the same input before an executor runs
 - Executors in `src/tool-operations.ts` load behind a cached dynamic import, so the extensions register tools without loading the providers. Each one returns the formatter text every host prints and the data as `details`; MCP sends only the text, the AI SDK gets `{ ...details, text }`, the CLI prints `details` with `--json`. Provider text goes through `answer()`, which keeps line breaks and strips escapes, C0/C1 controls and bidi marks. Caller text (query, artist, track, provider) goes through `sanitizeLine` from `@agntn/tools` first: it comes back in headers and errors, and since MCP gets text instead of JSON, a newline in it would forge a line of the reply
 - `lyrics_line_at` fetches the synced lyrics itself and returns one line with its source, on every surface. A whole LRC never has to pass through the model to read one line
+- `lyrics mcp` from a checkout serves `src/`, so a change costs a restart, not `pnpm build`; only an edit to `src/cli.ts` itself still needs the build. `LYRICS_DIST=1`, a copy under `node_modules`, a tree without `src/` and Node run with `--no-strip-types` keep the bundle. Served from `src/`, the server refuses every call once anything under `src/` changed after the process started, and drops the answer of a call the change landed in: loaded modules stay cached, so a lazy import would mix old and new code. Its own `tools/call` handler forwards no progress notifications; no lyrics tool sends any
 - Cancellation rides on `ProviderConfig.signal`: the base `Provider` adds it to every request, `selectProvider()` and the fan-out helpers in `core/all.ts` take it as their last argument, and every agent surface hands over its host's signal (the `@agntn/tools` adapters pass it to executors as `context.signal`). An aborted fallback walk stops at the provider it reached, whatever that provider threw
 - `selectProvider()` in `core/resolve.ts` is the single selection path for the CLI, MCP, AI tools and both extensions; empty or whitespace-only arguments count as absent. The value `all` is reserved and tested with `isAllProviders()` before selection
 
@@ -67,9 +68,11 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 - `src/core/client.ts` - native `fetch` wrapper: `getJSON` parses the body whatever its content type, `getText` keeps HTML a string; 15 s timeout joined with the caller's `signal`, no retry, identifying User-Agent. A 4xx or 5xx becomes a `ResponseError`, which `normalizeError()` classifies before it leaves the client
 - `src/providers/*.ts` - one file per provider, self-registering via `register()`; order in `index.ts` is the fallback order
 - `src/tools.ts` - the tool definitions and `loadOperations()`; `src/tool-operations.ts` - their executors
-- `src/mcp.ts` - `createMcpServer()` over the same read-only tools
+- `src/mcp.ts` - `createMcpServer()` over the same read-only tools, with the restart guard when it runs from `src/`
+- `src/server-info.ts` - name, version and description, shared by `lyrics --help` and both MCP builds
+- `src/source-change.ts` - `sourceChangeCheck()`, the newest ctime under `src/` against the process start
 - `src/ai.ts` - Vercel AI SDK tool surface
-- `src/cli.ts` - `runCli` builds one command per tool, plus `mcp`. `src/cli-commands.ts` holds `synced`, a CLI-only command over the same executors. Short flags and the joined `search` query come from the `short` and `rest` hints on each definition, so a new option takes its letter there
+- `src/cli.ts` - `runCli` builds one command per tool, plus `mcp`. A bare `mcp` from `dist/cli.mjs` inside a checkout serves `src/mcp.ts` instead. `src/cli-commands.ts` holds `synced`, a CLI-only command over the same executors. Short flags and the joined `search` query come from the `short` and `rest` hints on each definition, so a new option takes its letter there
 - `extensions/pi/lyrics.ts`, `extensions/omp/lyrics.ts` - agent extensions; they load the tool list from `src/tools.ts` in a checkout and `dist/tools.mjs` in the package. The OMP loader keeps both dynamic imports literal: `existsSync(src)` chooses `import("../../src/tools.ts")` or `import("../../dist/tools.mjs")`. OMP gets its `Text` from `pi.pi.Text`; no import from `@oh-my-pi/pi-coding-agent/tui`, which compiled OMP doesn't hand to extensions and which took the whole extension down before. An `import(url.href)` loses dependency resolution in the compiled binary
 
 ## Constraints
@@ -85,7 +88,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 
 ## Testing
 
-`pnpm test` (`vp test run`, 21 files / 291 tests, mocked via `vi.stubGlobal("fetch", ...)`; `client.test.ts` also runs the client against a loopback `node:http` server).
+`pnpm test` (`vp test run`, 23 files / 308 tests, mocked via `vi.stubGlobal("fetch", ...)`; `client.test.ts` also runs the client against a loopback `node:http` server). `bin.test.ts` starts `dist/cli.mjs mcp` and skips its 10 tests without a built `dist/`.
 
 Packed-layout gate (manual): `pnpm pack`, install the tarball with `npm install --legacy-peer-deps` in an empty dir, register a custom provider through the main entry and confirm `lyrics_providers` from `@agntn/lyrics/mcp` lists it - this catches registry chunk splits, missing deps and broken `files`.
 

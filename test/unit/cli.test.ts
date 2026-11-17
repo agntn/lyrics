@@ -10,6 +10,7 @@ import { Provider } from "../../src/core/provider.ts";
 import { register } from "../../src/core/registry.ts";
 import type { Lyrics, SearchOptions, TrackMatch } from "../../src/core/types.ts";
 import "../../src/providers/index.ts";
+import { serverInfo } from "../../src/server-info.ts";
 import { lyricsTools } from "../../src/tools.ts";
 import { AttributedProvider, FAKE_PLAIN, FAKE_SYNCED } from "../helpers.ts";
 
@@ -138,9 +139,7 @@ async function cli(...argv: string[]) {
   });
   try {
     await createCli({
-      name: "lyrics",
-      version: pkg.version,
-      description: "Unified song lyrics CLI",
+      ...serverInfo,
       tools: lyricsTools,
       commands: [syncedCommand],
     }).run(argv);
