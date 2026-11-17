@@ -5,7 +5,7 @@ import type {
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import lyricsExtension from "../../packages/pi/extensions/lyrics.ts";
+import lyricsExtension from "../../extensions/pi/lyrics.ts";
 import { register } from "../../src/core/registry.ts";
 import "../../src/providers/index.ts";
 import { lyricsTools } from "../../src/tools.ts";

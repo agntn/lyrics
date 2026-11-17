@@ -12,7 +12,7 @@ vi.mock("@oh-my-pi/pi-coding-agent/tui", () => {
   throw new Error("The OMP host does not inject the TUI barrel");
 });
 
-import lyricsOmpExtension from "../../packages/omp/extensions/lyrics.ts";
+import lyricsOmpExtension from "../../extensions/omp/lyrics.ts";
 import { register } from "../../src/core/registry.ts";
 import "../../src/providers/index.ts";
 import { lyricsTools } from "../../src/tools.ts";

@@ -70,7 +70,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 - `src/mcp.ts` - `createMcpServer()` over the same read-only tools
 - `src/ai.ts` - Vercel AI SDK tool surface
 - `src/cli.ts` - `runCli` builds one command per tool, plus `mcp`. `src/cli-commands.ts` holds `synced`, a CLI-only command over the same executors. Short flags and the joined `search` query come from the `short` and `rest` hints on each definition, so a new option takes its letter there
-- `packages/pi/extensions/lyrics.ts`, `packages/omp/extensions/lyrics.ts` - agent extensions; they load the tool list from `src/tools.ts` in a checkout and `dist/tools.mjs` in the package. The OMP loader keeps both dynamic imports literal: `existsSync(src)` chooses `import("../../../src/tools.ts")` or `import("../../../dist/tools.mjs")`. OMP gets its `Text` from `pi.pi.Text`; no import from `@oh-my-pi/pi-coding-agent/tui`, which compiled OMP doesn't hand to extensions and which took the whole extension down before. An `import(url.href)` loses dependency resolution in the compiled binary
+- `extensions/pi/lyrics.ts`, `extensions/omp/lyrics.ts` - agent extensions; they load the tool list from `src/tools.ts` in a checkout and `dist/tools.mjs` in the package. The OMP loader keeps both dynamic imports literal: `existsSync(src)` chooses `import("../../src/tools.ts")` or `import("../../dist/tools.mjs")`. OMP gets its `Text` from `pi.pi.Text`; no import from `@oh-my-pi/pi-coding-agent/tui`, which compiled OMP doesn't hand to extensions and which took the whole extension down before. An `import(url.href)` loses dependency resolution in the compiled binary
 
 ## Constraints
 
