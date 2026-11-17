@@ -11,7 +11,7 @@ minimumReleaseAgeExclude:
 catalogs:
   deps:
     "@agntn/tools": 0.2.1
-    "@modelcontextprotocol/server": 2.2.0
+    "@modelcontextprotocol/server": 2.3.0
     node-html-parser: 9.0.4
   dev:
     "@agntn/ox": 0.1.0
