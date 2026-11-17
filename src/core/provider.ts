@@ -8,6 +8,12 @@ import type {
 } from "./types.ts";
 import { getJSON, getText } from "./client.ts";
 import type { ClientOptions } from "./client.ts";
+
+/** What a provider may set on one request. The name and the timeout are the provider's own. */
+interface RequestOptions {
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly signal?: AbortSignal;
+}
 import { InvalidInputError, UnsupportedOperationError } from "./errors.ts";
 
 /**
@@ -26,7 +32,11 @@ export abstract class Provider {
     this.signal = config.signal;
   }
 
-  /** Registry key owned by the concrete class. */
+  /**
+   * Registry key owned by the concrete class.
+   *
+   * @returns {string} The key.
+   */
   get name(): string {
     return (this.constructor as ProviderConstructor).key;
   }
@@ -40,24 +50,35 @@ export abstract class Provider {
   /** List tracks matching a free-form query, best match first. */
   search?(query: string, options?: SearchOptions): Promise<TrackMatch[]>;
 
-  /** Execute a provider-attributed GET request for JSON using the configured timeout and signal. */
-  protected getJSON<T>(
-    url: string,
-    options?: Omit<ClientOptions, "provider" | "timeout">,
-  ): Promise<T> {
+  /**
+   * Execute a provider-attributed GET request for JSON using the configured timeout and signal.
+   *
+   * @param url - Absolute request URL.
+   * @param options - Headers and a signal for this request.
+   * @returns {Promise<T>} The parsed body.
+   */
+  protected getJSON<T>(url: string, options?: RequestOptions): Promise<T> {
     return getJSON<T>(url, this.requestOptions(options));
   }
 
-  /** Execute a provider-attributed GET request for an HTML page. */
-  protected getText(
-    url: string,
-    options?: Omit<ClientOptions, "provider" | "timeout">,
-  ): Promise<string> {
+  /**
+   * Execute a provider-attributed GET request for an HTML page.
+   *
+   * @param url - Absolute request URL.
+   * @param options - Headers and a signal for this request.
+   * @returns {Promise<string>} The page.
+   */
+  protected getText(url: string, options?: RequestOptions): Promise<string> {
     return getText(url, this.requestOptions(options));
   }
 
-  /** Attribute a request to this provider. Its signal and the configured one both cancel it. */
-  private requestOptions(options?: Omit<ClientOptions, "provider" | "timeout">): ClientOptions {
+  /**
+   * Attribute a request to this provider. Its signal and the configured one both cancel it.
+   *
+   * @param options - Headers and a signal for this request.
+   * @returns {ClientOptions} The options the client gets.
+   */
+  private requestOptions(options?: RequestOptions): ClientOptions {
     const signals = [options?.signal, this.signal].filter((signal) => signal !== undefined);
     return {
       ...options,
@@ -86,6 +107,8 @@ export interface ProviderConstructor {
  * Reject an empty or whitespace-only search query before any request is sent.
  *
  * @throws {InvalidInputError} When `query` carries no content.
+ * @param query - The search query.
+ * @param provider - Provider to name in the error.
  */
 export function assertQuery(query: string, provider: string): void {
   if (!query.trim()) {
@@ -100,6 +123,8 @@ export function assertQuery(query: string, provider: string): void {
  * also passes a provider-native `id`.
  *
  * @throws {InvalidInputError} When artist or track is missing or blank.
+ * @param query - The track query.
+ * @param provider - Provider to name in the error.
  */
 export function assertTrackQuery(query: TrackQuery, provider: string): void {
   if (!query.artist?.trim()) {
@@ -126,6 +151,9 @@ export type ProviderOperation = "search" | "lyrics";
  * it never implemented fails here rather than as `undefined is not a function` deeper in a call.
  *
  * @throws {UnsupportedOperationError} When the provider does not serve the operation.
+ * @param provider - The provider to ask.
+ * @param operation - `search` or `lyrics`.
+ * @returns {NonNullable<Provider[K]>} The method, bound to the provider.
  */
 export function requireOperation<K extends ProviderOperation>(
   provider: Provider,

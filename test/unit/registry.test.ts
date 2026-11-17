@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { UnknownProviderError, UnsupportedOperationError } from "../../src/core/errors.ts";
 import { Provider, requireOperation } from "../../src/core/provider.ts";
 import type { ProviderCapabilities } from "../../src/core/types.ts";

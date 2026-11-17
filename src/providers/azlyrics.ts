@@ -26,6 +26,10 @@ const LYRICS_SELECTOR = "div.col-xs-12.col-lg-8.text-center > div:not([class])";
  * Slugs are lowercase alphanumerics with nothing between them, and a leading "the" is dropped
  * from the artist: verified live, `beatles/yesterday` resolves while `thebeatles/yesterday`
  * is a 404.
+ *
+ * @param artist - Artist name.
+ * @param track - Track title.
+ * @returns {string} The path, without a leading slash.
  */
 export function azlyricsPath(artist: string, track: string): string {
   const artistSlug = slugify(artist).replace(/^the(?=.)/, "");

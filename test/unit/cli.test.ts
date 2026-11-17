@@ -3,7 +3,7 @@ import { createCli } from "@agntn/tools/cli";
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import pkg from "../../package.json" with { type: "json" };
 import { syncedCommand } from "../../src/cli-commands.ts";
 import { Provider } from "../../src/core/provider.ts";

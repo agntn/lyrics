@@ -13,6 +13,9 @@ export { isConfigured } from "./registry.ts";
  * Empty and whitespace-only strings mean "no preference". Every surface asks this question, and
  * each one that answered it inline drifted: a truthiness check treats `"  "` as a named provider
  * and skips the fallback walk the caller expected.
+ *
+ * @param value - The argument as the caller sent it.
+ * @returns {string | undefined} The trimmed name, or nothing.
  */
 export function providerArg(value?: string): string | undefined {
   return value?.trim() || undefined;
@@ -25,6 +28,9 @@ export function providerArg(value?: string): string | undefined {
  * Selection needs this for the two operations, and the surfaces need it for the other two
  * capabilities: asking for a translation is worth nothing if the walk stops at a provider that
  * has none. One list, four capabilities, no per-surface copies.
+ *
+ * @param capability - An operation or a result kind.
+ * @returns {string[]} Registry keys.
  */
 export function usableProviders(capability: keyof ProviderCapabilities): string[] {
   return providers().filter(
@@ -39,6 +45,9 @@ export function usableProviders(capability: keyof ProviderCapabilities): string[
 /**
  * Check for the reserved "all" provider value, which fans a request out to every registered
  * provider instead of selecting one. Surfaces test this before calling `selectProvider`.
+ *
+ * @param preferred - The provider argument.
+ * @returns {boolean} Whether it says `all`, in any case.
  */
 export function isAllProviders(preferred?: string): boolean {
   return preferred?.trim().toLowerCase() === "all";
@@ -57,6 +66,9 @@ export function isAllProviders(preferred?: string): boolean {
  * keyless LRCLIB returns the whole song, so promoting the keyed provider would be a downgrade.
  *
  * @throws {UnknownProviderError} When an explicit preference is not registered.
+ * @param preferred - A provider the caller named.
+ * @param operation - What the request needs; `lyrics` by default.
+ * @returns {string} The registry key to use.
  */
 export function resolveProvider(
   preferred?: string,
@@ -93,6 +105,11 @@ export interface SelectedProvider {
  * extensions. Empty or whitespace-only arguments count as absent, so a client that sends `""`
  * gets the same behavior as one that omits the field. A `signal` cancels every request the
  * returned provider makes, which is how a tool call hands its host's cancel button down.
+ *
+ * @param preferred - The provider argument, blank for none.
+ * @param operation - What the request needs; `lyrics` by default.
+ * @param signal - Cancels the provider's requests.
+ * @returns {SelectedProvider} The provider and its key.
  */
 export function selectProvider(
   preferred?: string,

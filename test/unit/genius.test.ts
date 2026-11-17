@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { AuthError, ParseError } from "../../src/core/errors.ts";
 import { create } from "../../src/core/registry.ts";
 import { geniusSongUrl } from "../../src/providers/genius.ts";
-import { FAKE_PLAIN, stubHTML, stubRoutes } from "../helpers.ts";
+import { FAKE_PLAIN, requestedUrl, stubHTML, stubRoutes } from "../helpers.ts";
 import "../../src/providers/genius.ts";
 
 /** Song page shape: several `data-lyrics-container` sections, lines split by `<br>`. */
@@ -65,7 +65,7 @@ describe("genius provider", () => {
       track: "Placeholder Song",
     });
 
-    expect(String(fetch.mock.calls[0]?.[0])).toBe(
+    expect(requestedUrl(fetch)).toBe(
       "https://genius.com/Placeholder-artist-placeholder-song-lyrics",
     );
     expect(lyrics).toMatchObject({
@@ -93,7 +93,7 @@ describe("genius provider", () => {
 
     const lyrics = await create("genius").lyrics({ artist: "Placeholder", track: "Song" });
 
-    expect(String(fetch.mock.calls[0]?.[0])).toContain("api.genius.com/search");
+    expect(requestedUrl(fetch)).toContain("api.genius.com/search");
     expect(lyrics.artist).toBe("Placeholder Artist");
     expect(lyrics.track).toBe("Placeholder Song");
   });

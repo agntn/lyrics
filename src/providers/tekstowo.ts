@@ -38,13 +38,31 @@ const RESULT_SELECTOR = "div.content div.card a.title";
 /** A track id here is a site path: exactly two slug segments, as `search()` returns. */
 const PATH_ID = /^[a-z0-9-]+\/[a-z0-9-]+$/;
 
-/** Song page path, for example `radiohead/creep`. Diacritics fold onto ASCII. */
+/**
+ * Song page path, for example `radiohead/creep`. Diacritics fold onto ASCII.
+ *
+ * @param artist - Artist name.
+ * @param track - Track title.
+ * @returns {string} The path, without a leading slash.
+ */
 export function tekstowoPath(artist: string, track: string): string {
   return `${slugify(artist, "-")}/${slugify(track, "-")}`;
 }
 
-/** Split "Artist - Title", the label shape used by both search rows and page headings. */
-function splitLabel(label: string, fallback: { artist: string; track: string }) {
+/** Artist and title, as a label or a query names them. */
+interface Labels {
+  readonly artist: string;
+  readonly track: string;
+}
+
+/**
+ * Split "Artist - Title", the label shape used by both search rows and page headings.
+ *
+ * @param label - The label text.
+ * @param fallback - What to return for a half the label lacks.
+ * @returns {Labels} Artist and title.
+ */
+function splitLabel(label: string, fallback: Labels): Labels {
   const separator = label.indexOf(" - ");
   if (separator === -1) return fallback;
   return {
@@ -81,7 +99,7 @@ class Tekstowo extends Provider {
     for (const row of rows) {
       const href = row.getAttribute("href");
       if (!href || href.split("/").filter(Boolean).length !== 2) continue;
-      const label = row.text.replace(/\s+/g, " ").trim();
+      const label = row.text.replaceAll(/\s+/g, " ").trim();
       const { artist, track } = splitLabel(label, { artist: "", track: label });
       matches.push({ artist, track, url: `${this.baseUrl}${href}` });
       if (matches.length >= clampMaxResults(options?.limit, MAX_RESULTS)) break;
@@ -100,7 +118,7 @@ class Tekstowo extends Provider {
     const url = `${this.baseUrl}/${query.id ?? tekstowoPath(query.artist, query.track)}`;
     const root = await parseHtml(await this.getText(url));
     const plain = requireLyrics(root, LYRICS_SELECTOR, Tekstowo.key, url);
-    const heading = selectText(root, "h1")?.replace(/\s+/g, " ") ?? "";
+    const heading = selectText(root, "h1")?.replaceAll(/\s+/g, " ") ?? "";
     const { artist, track } = splitLabel(heading, { artist: query.artist, track: query.track });
     return {
       provider: Tekstowo.key,

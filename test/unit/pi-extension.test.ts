@@ -4,7 +4,7 @@ import type {
   ExtensionToolContext,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import lyricsExtension from "../../extensions/pi/lyrics.ts";
 import { register } from "../../src/core/registry.ts";
 import "../../src/providers/index.ts";
@@ -30,7 +30,8 @@ async function registerExtensionTools(): Promise<Map<string, ToolDefinition>> {
     {
       get(target, key, receiver) {
         if (typeof key === "symbol" || key === "then" || Reflect.has(target, key)) {
-          return Reflect.get(target, key, receiver);
+          const member: unknown = Reflect.get(target, key, receiver);
+          return member;
         }
         throw new Error(`ExtensionAPI.${String(key)} is not stubbed`);
       },

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { InvalidInputError } from "../../src/core/errors.ts";
 import {
   formatDuration,
@@ -21,13 +21,13 @@ describe("normalizeLyrics", () => {
   });
 
   it("folds the non-breaking space that HTML providers deliver from &nbsp;", () => {
-    const nbsp = String.fromCharCode(0x00_a0);
+    const nbsp = String.fromCodePoint(0x00_a0);
 
     expect(normalizeLyrics(`First${nbsp}line`)).toBe("First line");
   });
 
   it("drops a zero-width space instead of turning it into a gap", () => {
-    const zeroWidth = String.fromCharCode(0x20_0b);
+    const zeroWidth = String.fromCodePoint(0x20_0b);
 
     expect(normalizeLyrics(`First${zeroWidth}line`)).toBe("Firstline");
   });

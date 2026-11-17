@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   AuthError,
   LyricsError,
@@ -7,7 +7,7 @@ import {
   RateLimitError,
 } from "../../src/core/errors.ts";
 import { create } from "../../src/core/registry.ts";
-import { FAKE_PLAIN, stubJSON } from "../helpers.ts";
+import { FAKE_PLAIN, requestedUrl, stubJSON } from "../helpers.ts";
 import "../../src/providers/musixmatch.ts";
 
 /** Musixmatch answers HTTP 200 for everything; the real status rides in the envelope header. */
@@ -57,7 +57,7 @@ describe("musixmatch provider", () => {
       track: "Placeholder Song",
     });
 
-    const url = String(fetch.mock.calls[0]?.[0]);
+    const url = requestedUrl(fetch);
     expect(url).toContain("matcher.lyrics.get");
     expect(url).toContain("q_artist=Placeholder+Artist");
     expect(lyrics).toMatchObject({
@@ -74,7 +74,7 @@ describe("musixmatch provider", () => {
 
     await create("musixmatch").lyrics({ artist: "a", track: "b", id: "42" });
 
-    expect(String(fetch.mock.calls[0]?.[0])).toContain("track.lyrics.get?track_id=42");
+    expect(requestedUrl(fetch)).toContain("track.lyrics.get?track_id=42");
   });
 
   it("cuts the free-plan banner and flags the result as an excerpt", async () => {

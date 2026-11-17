@@ -6,7 +6,11 @@ type ToolOperations = typeof import("./tool-operations.ts");
 
 let operations: Promise<ToolOperations> | undefined;
 
-/** Loads the executors once. A failed load isn't cached, so a broken `dist` doesn't stick. */
+/**
+ * Loads the executors once. A failed load isn't cached, so a broken `dist` doesn't stick.
+ *
+ * @returns {Promise<ToolOperations>} The executor module.
+ */
 export function loadOperations(): Promise<ToolOperations> {
   operations ??= import("./tool-operations.ts").catch((error: unknown) => {
     operations = undefined;

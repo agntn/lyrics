@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { NotFoundError, UnsupportedOperationError } from "../../src/core/errors.ts";
 import { requireOperation } from "../../src/core/provider.ts";
 import { create } from "../../src/core/registry.ts";
-import { FAKE_PLAIN, stubJSON } from "../helpers.ts";
+import { FAKE_PLAIN, requestedUrl, stubJSON } from "../helpers.ts";
 import "../../src/providers/lyricsovh.ts";
 
 afterEach(() => {
@@ -42,9 +42,7 @@ describe("lyricsovh provider", () => {
 
     await create("lyricsovh").lyrics({ artist: "AC/DC", track: "Song & Song" });
 
-    expect(String(fetch.mock.calls[0]?.[0])).toBe(
-      "https://api.lyrics.ovh/v1/AC%2FDC/Song%20%26%20Song",
-    );
+    expect(requestedUrl(fetch)).toBe("https://api.lyrics.ovh/v1/AC%2FDC/Song%20%26%20Song");
   });
 
   it("treats an empty body as a miss rather than empty lyrics", async () => {

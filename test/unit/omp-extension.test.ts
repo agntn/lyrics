@@ -5,7 +5,7 @@ import type {
   Theme,
   ToolDefinition,
 } from "@oh-my-pi/pi-coding-agent";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 /** Compiled OMP gives an extension only the package root, so loading the TUI barrel has to fail. */
 vi.mock("@oh-my-pi/pi-coding-agent/tui", () => {
@@ -142,8 +142,8 @@ describe("lyrics OMP extension", () => {
   });
 
   it("strips terminal control sequences from rendered arguments", async () => {
-    const escape = String.fromCharCode(27);
-    const nul = String.fromCharCode(0);
+    const escape = String.fromCodePoint(27);
+    const nul = String.fromCodePoint(0);
 
     const line = await statusLine("lyrics_search", { query: `${escape}[31mred${escape}[0m${nul}` });
 
@@ -153,7 +153,7 @@ describe("lyrics OMP extension", () => {
   });
 
   it("keeps line breaks in tool output while removing control bytes", async () => {
-    const escape = String.fromCharCode(27);
+    const escape = String.fromCodePoint(27);
     stubJSON({ ...LRCLIB_TRACK, plainLyrics: `First ${escape}[2Jline\u0007\nSecond line` });
 
     const output = await text("lyrics_get", { artist: "a", track: "b" });

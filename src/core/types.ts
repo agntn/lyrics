@@ -101,6 +101,10 @@ export interface ProviderConfig {
  * Round a requested result limit and keep it inside the provider's range.
  *
  * A missing or zero limit uses `max`.
+ *
+ * @param limit - The requested limit.
+ * @param max - The provider's ceiling.
+ * @returns {number} A whole number from 1 to `max`.
  */
 export function clampMaxResults(limit?: number, max = 10): number {
   if (!limit) return max;

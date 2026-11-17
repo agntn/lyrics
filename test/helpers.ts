@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { vi } from "vite-plus/test";
 import { Provider } from "../src/core/provider.ts";
 import type { Lyrics } from "../src/core/types.ts";
 
@@ -83,12 +83,24 @@ export function stubPendingFetch(): AbortSignal[] {
   return signals;
 }
 
+/** The address of a request, whichever of the three shapes fetch takes. */
+function urlOf(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  return input instanceof URL ? input.href : input.url;
+}
+
+/** The URL a stubbed fetch was called with, empty when that call never happened. */
+export function requestedUrl(fetch: ReturnType<typeof stubRoutes>, call = 0): string {
+  const input = fetch.mock.calls[call]?.[0];
+  return input === undefined ? "" : urlOf(input);
+}
+
 /** Stub global fetch with a per-URL body map; unmatched URLs answer 404. */
 export function stubRoutes(
   routes: Record<string, { body: unknown; status?: number; html?: boolean }>,
 ) {
   const fetch = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const url = urlOf(input);
     const match = Object.entries(routes).find(([pattern]) => url.includes(pattern));
     if (!match) {
       return new Response(JSON.stringify({ error: "not found" }), {

@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { InvalidInputError, ParseError } from "../../src/core/errors.ts";
 import { create } from "../../src/core/registry.ts";
 import { tekstowoPath } from "../../src/providers/tekstowo.ts";
-import { FAKE_PLAIN, stubHTML } from "../helpers.ts";
+import { FAKE_PLAIN, requestedUrl, stubHTML } from "../helpers.ts";
 import "../../src/providers/tekstowo.ts";
 
 /** Song page shape: original text in #songText, community translation in #translation. */
@@ -60,9 +60,7 @@ describe("tekstowo provider", () => {
       track: "Placeholder Song",
     });
 
-    expect(String(fetch.mock.calls[0]?.[0])).toBe(
-      "https://www.tekstowo.pl/placeholder-artist/placeholder-song",
-    );
+    expect(requestedUrl(fetch)).toBe("https://www.tekstowo.pl/placeholder-artist/placeholder-song");
     expect(lyrics).toMatchObject({
       provider: "tekstowo",
       artist: "Placeholder Artist",
@@ -121,9 +119,7 @@ describe("tekstowo provider", () => {
 
     await create("tekstowo").lyrics({ artist: "a", track: "b", id: "placeholder-artist/song" });
 
-    expect(String(fetch.mock.calls[0]?.[0])).toBe(
-      "https://www.tekstowo.pl/placeholder-artist/song",
-    );
+    expect(requestedUrl(fetch)).toBe("https://www.tekstowo.pl/placeholder-artist/song");
   });
 
   it.each(["../../elsewhere", "https://example.test/x", "one-segment", "a/b/c", "a/b?x=1"])(

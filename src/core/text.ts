@@ -22,16 +22,19 @@ const LRC_TIMESTAMP = /\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]/g;
  * `\p{Zs}` covers the non-breaking space that HTML providers deliver from `&nbsp;`, which looks
  * like a space but compares unequal to one. Zero-width characters are deleted rather than
  * folded: they are invisible, so turning one into a space would insert a gap that is not there.
+ *
+ * @param text - Lyrics as a provider served them.
+ * @returns {string} The normalized text.
  */
 export function normalizeLyrics(text: string): string {
   return text
-    .replace(/\r\n?/g, "\n")
-    .replace(/[\u{00AD}\u{200B}-\u{200D}\u{FEFF}]/gu, "")
-    .replace(/[\t\p{Zs}]/gu, " ")
+    .replaceAll(/\r\n?/g, "\n")
+    .replaceAll(/[\u{00AD}\u{200B}-\u{200D}\u{FEFF}]/gu, "")
+    .replaceAll(/[\t\p{Zs}]/gu, " ")
     .split("\n")
     .map((line) => line.replace(/\s+$/, ""))
     .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
+    .replaceAll(/\n{3,}/g, "\n\n")
     .trim();
 }
 
@@ -45,13 +48,16 @@ export function normalizeLyrics(text: string): string {
  *   ```ts
  *   parseLrc("[00:12.50] first line"); // [{ time: 12.5, text: "first line" }]
  *   ```
+ *
+ * @param synced - LRC text.
+ * @returns {SyncedLine[]} The timed lines.
  */
 export function parseLrc(synced: string): SyncedLine[] {
   const lines: SyncedLine[] = [];
   for (const raw of normalizeLyrics(synced).split("\n")) {
     const stamps = [...raw.matchAll(LRC_TIMESTAMP)];
     if (stamps.length === 0) continue;
-    const text = raw.replace(LRC_TIMESTAMP, "").trim();
+    const text = raw.replaceAll(LRC_TIMESTAMP, "").trim();
     for (const stamp of stamps) {
       const minutes = Number(stamp[1]);
       const seconds = Number(stamp[2]?.replace(":", "."));
@@ -67,12 +73,15 @@ export function parseLrc(synced: string): SyncedLine[] {
  *
  * `parseLrc` already normalized the input, so the join only needs the blank-line collapse that
  * dropping timestamps can expose, not another full normalization pass.
+ *
+ * @param synced - LRC text.
+ * @returns {string} The lines without their timestamps.
  */
 export function lrcToPlain(synced: string): string {
   return parseLrc(synced)
     .map((line) => line.text)
     .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
+    .replaceAll(/\n{3,}/g, "\n\n")
     .trim();
 }
 
@@ -83,8 +92,14 @@ export function lrcToPlain(synced: string): string {
  * a caller that also needs the line count does not pay for parsing the same LRC twice.
  *
  * @throws {InvalidInputError} When `seconds` is not a finite, non-negative number.
+ * @param synced - LRC text or lines `parseLrc` returned.
+ * @param seconds - Offset from the start of the recording.
+ * @returns {SyncedLine | undefined} The line, or nothing before the first one.
  */
-export function lineAt(synced: string | SyncedLine[], seconds: number): SyncedLine | undefined {
+export function lineAt(
+  synced: string | readonly SyncedLine[],
+  seconds: number,
+): SyncedLine | undefined {
   if (!Number.isFinite(seconds) || seconds < 0) {
     throw new InvalidInputError(`seconds must be a non-negative number, got ${seconds}`);
   }
@@ -101,6 +116,9 @@ export function lineAt(synced: string | SyncedLine[], seconds: number): SyncedLi
  *
  * Truncates rather than rounds: a line that starts at 20.5 s is already being sung at 0:20, and
  * showing 0:21 would put it in the future.
+ *
+ * @param seconds - A duration or an offset.
+ * @returns {string} The timestamp.
  */
 export function formatDuration(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds));

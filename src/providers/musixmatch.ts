@@ -48,7 +48,12 @@ const EXCERPT_BANNER = /^[^\S\n]*\*{3,}/m;
 /** Ellipsis line marking where the text was cut; it belongs to the banner, not to the song. */
 const EXCERPT_ELLIPSIS = /\n[^\S\n]*\.{3}$/;
 
-/** Split a served body into the text proper and whether it was an excerpt. */
+/**
+ * Split a served body into the text proper and whether it was an excerpt.
+ *
+ * @param body - The lyrics body as served.
+ * @returns {{ text: string; partial: boolean }} The text and the excerpt flag.
+ */
 function cutExcerptBanner(body: string): { text: string; partial: boolean } {
   const bannerAt = body.search(EXCERPT_BANNER);
   if (bannerAt === -1) return { text: body, partial: false };
@@ -88,6 +93,8 @@ interface MusixmatchLyrics {
 /**
  * Map the in-body status code onto the error hierarchy.
  *
+ * @param status - `status_code` from the envelope header.
+ * @param resource - What was asked for, for the error.
  * @throws {LyricsError} For every documented non-success code.
  */
 function assertOkStatus(status: number | undefined, resource: string): void {
@@ -138,7 +145,11 @@ class Musixmatch extends Provider {
     };
   }
 
-  /** The key travels as a query param, which the error sanitizer redacts. */
+  /**
+   * The key travels as a query param, which the error sanitizer redacts.
+   *
+   * @returns {string} The key.
+   */
   private requireApiKey(): string {
     if (!this.apiKey) {
       throw new AuthError(Musixmatch.key, `set ${Musixmatch.envKey}`);
@@ -148,7 +159,7 @@ class Musixmatch extends Provider {
 
   private async call<T>(
     method: string,
-    params: Record<string, string | number | undefined>,
+    params: Readonly<Record<string, string | number | undefined>>,
     resource: string,
   ): Promise<T> {
     const url = `${this.baseUrl}/${method}${buildQuery({
