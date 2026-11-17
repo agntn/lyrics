@@ -23,6 +23,13 @@ export interface SerializedOutcome<T> {
   error?: string;
 }
 
+/**
+ * Run one operation on every registered provider in parallel.
+ *
+ * @param run - The operation.
+ * @param signal - Cancels every request.
+ * @returns {Promise<ProviderOutcome<T>[]>} One outcome per provider, in registration order.
+ */
 async function runAll<T>(
   run: (provider: Provider) => Promise<T>,
   signal?: AbortSignal,
@@ -47,6 +54,11 @@ async function runAll<T>(
  *
  *   const outcomes = await searchAll("creep radiohead", { limit: 3 });
  *   ```
+ *
+ * @param query - Free-form search query.
+ * @param options - Result limit.
+ * @param signal - Cancels every request.
+ * @returns {Promise<ProviderOutcome<TrackMatch[]>[]>} Each provider's matches or failure.
  */
 export function searchAll(
   query: string,
@@ -56,7 +68,13 @@ export function searchAll(
   return runAll((provider) => requireOperation(provider, "search")(query, options), signal);
 }
 
-/** Fetch one track's lyrics from every registered provider in parallel, for comparison. */
+/**
+ * Fetch one track's lyrics from every registered provider in parallel, for comparison.
+ *
+ * @param query - The track to look up.
+ * @param signal - Cancels every request.
+ * @returns {Promise<ProviderOutcome<Lyrics>[]>} Each provider's lyrics or failure.
+ */
 export function lyricsAll(
   query: TrackQuery,
   signal?: AbortSignal,
@@ -90,11 +108,15 @@ export interface FallbackResult {
  *   const { provider, lyrics } = await lyricsWithFallback({ artist: "Radiohead", track: "Creep" });
  *   ```
  *
+ * @param query - The track to look up.
+ * @param order - Registry keys to try; every provider by default.
+ * @param signal - Stops the walk at the provider it reached.
+ * @returns {Promise<FallbackResult>} The lyrics and the providers passed over before them.
  * @throws {LyricsError} The last failure, when no provider could serve the track.
  */
 export async function lyricsWithFallback(
   query: TrackQuery,
-  order: string[] = providers(),
+  order: readonly string[] = providers(),
   signal?: AbortSignal,
 ): Promise<FallbackResult> {
   const skipped: { provider: string; error: string }[] = [];
@@ -130,12 +152,25 @@ const SKIPPABLE_ERRORS = new Set([
   "ParseError",
 ]);
 
+/**
+ * Whether the walk moves on after this failure.
+ *
+ * @param error - A normalized failure.
+ * @returns {boolean} True for a failure that only says this provider lacks the song.
+ */
 function isSkippable(error: LyricsError): boolean {
   return SKIPPABLE_ERRORS.has(error.name);
 }
 
-/** Reduce outcomes to a JSON-safe shape for MCP and AI tool results. */
-export function serializeOutcomes<T>(outcomes: ProviderOutcome<T>[]): SerializedOutcome<T>[] {
+/**
+ * Reduce outcomes to a JSON-safe shape for MCP and AI tool results.
+ *
+ * @param outcomes - Outcomes from a fan-out.
+ * @returns {SerializedOutcome<T>[]} The outcomes with errors reduced to their messages.
+ */
+export function serializeOutcomes<T>(
+  outcomes: readonly ProviderOutcome<T>[],
+): SerializedOutcome<T>[] {
   return outcomes.map((outcome) =>
     outcome.error
       ? { provider: outcome.provider, error: outcome.error.message }

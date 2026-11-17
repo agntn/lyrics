@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { Provider } from "../../src/core/provider.ts";
 import { register } from "../../src/core/registry.ts";
 import type { Lyrics } from "../../src/core/types.ts";

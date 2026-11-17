@@ -35,20 +35,23 @@ const LYRICS_SELECTOR = "[data-lyrics-container]";
 const PAGE_HEADER_SELECTOR = "[data-exclude-from-selection]";
 
 interface GeniusSong {
-  id: number;
-  title?: string;
-  full_title?: string;
-  url?: string;
-  primary_artist?: { name?: string };
-  release_date_for_display?: string;
+  readonly id: number;
+  readonly title?: string;
+  readonly full_title?: string;
+  readonly url?: string;
+  readonly primary_artist?: { readonly name?: string };
+  readonly release_date_for_display?: string;
 }
 
 interface GeniusSearchResponse {
   response?: { hits?: { result?: GeniusSong }[] };
 }
 
+/** A song as its own endpoint returns it, album included. */
+type GeniusPageSong = GeniusSong & { readonly album?: { readonly name?: string } };
+
 interface GeniusSongResponse {
-  response?: { song?: GeniusSong & { album?: { name?: string } } };
+  response?: { song?: GeniusPageSong };
 }
 
 /**
@@ -57,11 +60,33 @@ interface GeniusSongResponse {
  * Verified against live pages: words are joined with hyphens, only the first character of the
  * artist is capitalized, and leading articles are kept - `Beatles-yesterday-lyrics` is a 404
  * while `The-beatles-yesterday-lyrics` resolves.
+ *
+ * @param artist - Artist name.
+ * @param track - Track title.
+ * @returns {string} The page URL.
  */
 export function geniusSongUrl(artist: string, track: string): string {
   const artistSlug = slugify(artist, "-");
   const capitalized = artistSlug.charAt(0).toUpperCase() + artistSlug.slice(1);
   return `${SITE_URL}/${capitalized}-${slugify(track, "-")}-lyrics`;
+}
+
+/**
+ * Artist, title and album as Genius spells them, or as the caller did without a record.
+ *
+ * @param song - The record the API returned, if any.
+ * @param query - The track query.
+ * @returns {Pick<Lyrics, "artist" | "track" | "album">} The labels.
+ */
+function songLabels(
+  song: GeniusPageSong | undefined,
+  query: TrackQuery,
+): Pick<Lyrics, "artist" | "track" | "album"> {
+  return {
+    artist: song?.primary_artist?.name ?? query.artist,
+    track: song?.title ?? query.track,
+    album: song?.album?.name,
+  };
 }
 
 class Genius extends Provider {
@@ -86,7 +111,11 @@ class Genius extends Provider {
     };
   }
 
-  /** Bearer header, or a clear failure naming the variable to set. */
+  /**
+   * Bearer header, or a clear failure naming the variable to set.
+   *
+   * @returns {Record<string, string>} The header.
+   */
   private authHeaders(): Record<string, string> {
     if (!this.apiKey) {
       throw new AuthError(Genius.key, `set ${Genius.envKey} to search Genius`);
@@ -120,13 +149,10 @@ class Genius extends Provider {
     const page = await this.getText(url);
     const root = await parseHtml(page);
     for (const header of root.querySelectorAll(PAGE_HEADER_SELECTOR)) header.remove();
-    const plain = requireLyrics(root, LYRICS_SELECTOR, Genius.key, url);
     return {
       provider: Genius.key,
-      artist: song?.primary_artist?.name ?? query.artist,
-      track: song?.title ?? query.track,
-      album: song?.album?.name,
-      plain,
+      ...songLabels(song, query),
+      plain: requireLyrics(root, LYRICS_SELECTOR, Genius.key, url),
       instrumental: false,
       partial: false,
       url,
@@ -141,10 +167,11 @@ class Genius extends Provider {
    * the derived URL, so a missing token is not an error on this path - unless the caller passed
    * an `id`, which only the API can resolve. Silently ignoring it would answer a different
    * question than the one asked.
+   *
+   * @param query - The track query.
+   * @returns {Promise<GeniusPageSong | undefined>} The record, or nothing without a token.
    */
-  private async findSong(
-    query: TrackQuery,
-  ): Promise<(GeniusSong & { album?: { name?: string } }) | undefined> {
+  private async findSong(query: TrackQuery): Promise<GeniusPageSong | undefined> {
     if (!this.apiKey) {
       if (query.id) {
         throw new AuthError(Genius.key, `set ${Genius.envKey} to look a song up by id`);
@@ -160,7 +187,7 @@ class Genius extends Provider {
     }
     const matches = await this.search(`${query.artist} ${query.track}`, { limit: 1 });
     const first = matches[0];
-    return first?.raw as (GeniusSong & { album?: { name?: string } }) | undefined;
+    return first?.raw as GeniusPageSong | undefined;
   }
 }
 

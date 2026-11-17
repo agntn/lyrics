@@ -12,7 +12,11 @@ const PREVIEW_LENGTH = 80;
 
 const sourceModulePath = fileURLToPath(new URL("../../src/tools.ts", import.meta.url));
 
-/** Source in a checkout, build in the package; compiled OMP resolves only literal specifiers. */
+/**
+ * Source in a checkout, build in the package; compiled OMP resolves only literal specifiers.
+ *
+ * @returns {Promise<typeof LyricsTools>} The tools module.
+ */
 function loadTools(): Promise<typeof LyricsTools> {
   return (
     existsSync(sourceModulePath) ? import("../../src/tools.ts") : import("../../dist/tools.mjs")
@@ -32,7 +36,11 @@ const describeCall: Record<string, (args: Args) => string> = {
   lyrics_line_at: (args) => song(args, ` @ ${String(args["seconds"])}s`),
 };
 
-/** Register the lyrics tools with the OMP host; the library loads on the first call. */
+/**
+ * Register the lyrics tools with the OMP host; the library loads on the first call.
+ *
+ * @param pi - The OMP extension API.
+ */
 export default async function lyricsExtension(pi: ExtensionAPI): Promise<void> {
   pi.setLabel("Lyrics");
   const { lyricsTools } = await loadTools();

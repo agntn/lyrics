@@ -85,7 +85,7 @@ Live verification performed before scaffolding, per the agntn scaffold procedure
 
 ## Testing
 
-`pnpm test` (vitest, 21 files / 291 tests, mocked via `vi.stubGlobal("fetch", ...)`; `client.test.ts` also runs the client against a loopback `node:http` server).
+`pnpm test` (`vp test run`, 21 files / 291 tests, mocked via `vi.stubGlobal("fetch", ...)`; `client.test.ts` also runs the client against a loopback `node:http` server).
 
 Packed-layout gate (manual): `pnpm pack`, install the tarball with `npm install --legacy-peer-deps` in an empty dir, register a custom provider through the main entry and confirm `lyrics_providers` from `@agntn/lyrics/mcp` lists it - this catches registry chunk splits, missing deps and broken `files`.
 
@@ -96,7 +96,7 @@ Pi 1.x: the Pi peer runs `>=0.84.2 <2` and the dev pin sits on 1.0.2, so `tsc` c
 ```bash
 pnpm build       # obuild → dist/ (one bundle: index, cli, mcp, ai, tools)
 pnpm typecheck   # tsc → build → tsc -p tsconfig.extensions.json
-pnpm test        # vitest --run
-pnpm fmt         # oxlint --fix + oxfmt
-pnpm lint        # oxlint + oxfmt --check
+pnpm test        # vp test run
+pnpm fmt         # build → vp lint --fix → vp fmt
+pnpm lint        # build → vp lint → vp fmt --check
 ```

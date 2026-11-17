@@ -49,11 +49,17 @@ export interface LineAtDetails {
 
 /** What `lyrics synced` prints from: the whole LRC, or the one line at `at`. */
 export interface SyncedInput {
-  artist: string;
-  track: string;
-  provider?: string;
-  at?: number;
-  duration?: number;
+  readonly artist: string;
+  readonly track: string;
+  readonly provider?: string;
+  readonly at?: number;
+  readonly duration?: number;
+}
+
+/** What `lyrics synced` answers with: the provider and its LRC, null when it has none. */
+export interface SyncedDetails {
+  provider: string;
+  synced: string | null;
 }
 
 /** Controls but tab and newline, plus the bidi marks that reorder a line. */
@@ -76,7 +82,14 @@ function stripEscapes(line: string): string {
   return stripVTControlCharacters(bounded);
 }
 
-/** Scraped text meets the terminal here: verses stay, escapes and bidi tricks don't. */
+/**
+ * Scraped text meets the terminal here: verses stay, escapes and bidi tricks don't.
+ *
+ * @param text - The text every host prints.
+ * @param details - The data behind it.
+ * @param isError - Marks the answer as a failure.
+ * @returns {ToolResult<Details>} The tool result.
+ */
 function answer<Details>(text: string, details: Details, isError?: true): ToolResult<Details> {
   const clean = text
     .replaceAll(/\r\n?/g, "\n")
@@ -95,7 +108,14 @@ function line(value: string | undefined): string | undefined {
   return value === undefined ? undefined : sanitizeLine(value);
 }
 
-/** Walks the providers that serve synced lyrics, or asks the one the caller named. */
+/**
+ * Walks the providers that serve synced lyrics, or asks the one the caller named.
+ *
+ * @param query - The track query.
+ * @param provider - A provider the caller named, blank for none.
+ * @param signal - Cancels the requests.
+ * @returns {Promise<Lyrics>} The lyrics, synced or not.
+ */
 async function fetchSynced(
   query: TrackQuery,
   provider: string | undefined,
@@ -107,7 +127,13 @@ async function fetchSynced(
   return (await lyricsWithFallback(query, usableProviders("synced"), signal)).lyrics;
 }
 
-/** The line at `seconds` with its timestamp, or a note that nobody sings there yet. */
+/**
+ * The line at `seconds` with its timestamp, or a note that nobody sings there yet.
+ *
+ * @param line - The line `lineAt` found.
+ * @param seconds - The offset that was asked for.
+ * @returns {string} One line of text.
+ */
 function lineText(line: SyncedLine | undefined, seconds: number): string {
   return line ? `[${formatDuration(line.time)}] ${line.text}` : `(nothing sung at ${seconds}s)`;
 }
@@ -200,11 +226,17 @@ export async function lineAt(
   });
 }
 
-/** `lyrics synced`: the whole LRC, or the line at `at`; a track without timestamps fails. */
+/**
+ * `lyrics synced`: the whole LRC, or the line at `at`; a track without timestamps fails.
+ *
+ * @param params - Track, provider and the optional offset.
+ * @param signal - Cancels the requests.
+ * @returns {Promise<ToolResult<SyncedDetails>>} The LRC or the one line, with its source.
+ */
 export async function synced(
   params: SyncedInput,
   signal?: AbortSignal,
-): Promise<ToolResult<{ provider: string; synced: string | null }>> {
+): Promise<ToolResult<SyncedDetails>> {
   const query = {
     artist: line(params.artist),
     track: line(params.track),

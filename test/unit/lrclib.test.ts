@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { InvalidInputError, NotFoundError } from "../../src/core/errors.ts";
 import { create } from "../../src/core/registry.ts";
-import { FAKE_PLAIN, FAKE_SYNCED, stubJSON } from "../helpers.ts";
+import { FAKE_PLAIN, FAKE_SYNCED, requestedUrl, stubJSON } from "../helpers.ts";
 import "../../src/providers/lrclib.ts";
 
 /**
@@ -66,7 +66,7 @@ describe("lrclib provider", () => {
       duration: 239,
     });
 
-    const url = String(fetch.mock.calls[0]?.[0]);
+    const url = requestedUrl(fetch);
     expect(url).toContain("artist_name=Placeholder+Artist");
     expect(url).toContain("track_name=Placeholder+Song");
     expect(url).toContain("album_name=Placeholder+Album");
@@ -78,7 +78,7 @@ describe("lrclib provider", () => {
 
     await create("lrclib").lyrics({ artist: "a", track: "b", id: "496" });
 
-    expect(String(fetch.mock.calls[0]?.[0])).toBe("https://lrclib.net/api/get/496");
+    expect(requestedUrl(fetch)).toBe("https://lrclib.net/api/get/496");
   });
 
   it("reports an instrumental without inventing text", async () => {

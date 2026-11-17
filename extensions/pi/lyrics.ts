@@ -10,14 +10,22 @@ import type * as LyricsTools from "../../dist/tools.d.mts";
 const sourceModuleUrl = new URL("../../src/tools.ts", import.meta.url);
 const distributionModuleUrl = new URL("../../dist/tools.mjs", import.meta.url);
 
-/** Load the definitions from the source in a checkout and from the build in the package. */
+/**
+ * Load the definitions from the source in a checkout and from the build in the package.
+ *
+ * @returns {Promise<typeof LyricsTools>} The tools module.
+ */
 function loadTools(): Promise<typeof LyricsTools> {
   return import(
     existsSync(fileURLToPath(sourceModuleUrl)) ? sourceModuleUrl.href : distributionModuleUrl.href
   ) as Promise<typeof LyricsTools>;
 }
 
-/** Register the lyrics tools; the library loads on the first call. */
+/**
+ * Register the lyrics tools; the library loads on the first call.
+ *
+ * @param pi - The Pi extension API.
+ */
 export default async function lyricsExtension(pi: ExtensionAPI): Promise<void> {
   const { lyricsTools } = await loadTools();
   registerPiTools(pi, lyricsTools);

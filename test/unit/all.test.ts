@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { lyricsAll, lyricsWithFallback, searchAll, serializeOutcomes } from "../../src/core/all.ts";
 import { NotFoundError, RateLimitError } from "../../src/core/errors.ts";
 import { Provider, requireOperation } from "../../src/core/provider.ts";
@@ -58,9 +58,8 @@ describe("lyricsWithFallback", () => {
 
     const result = await lyricsWithFallback(QUERY, ["miss-one", "has-it"]);
 
-    expect(result.skipped).toEqual([
-      { provider: "miss-one", error: expect.stringContaining("Not found") },
-    ]);
+    expect(result.skipped.map((entry) => entry.provider)).toEqual(["miss-one"]);
+    expect(result.skipped[0]?.error).toContain("Not found");
   });
 
   it("stops on a failure that is not about this provider missing the song", async () => {

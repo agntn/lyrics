@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { ParseError, UnsupportedOperationError } from "../../src/core/errors.ts";
 import { requireOperation } from "../../src/core/provider.ts";
 import { create } from "../../src/core/registry.ts";
 import { azlyricsPath } from "../../src/providers/azlyrics.ts";
-import { FAKE_PLAIN, stubHTML } from "../helpers.ts";
+import { FAKE_PLAIN, requestedUrl, stubHTML } from "../helpers.ts";
 import "../../src/providers/azlyrics.ts";
 
 /** Song page shape: the text sits in the one class-less div of the song column. */
@@ -51,7 +51,7 @@ describe("azlyrics provider", () => {
       track: "Placeholder Song",
     });
 
-    expect(String(fetch.mock.calls[0]?.[0])).toBe(
+    expect(requestedUrl(fetch)).toBe(
       "https://www.azlyrics.com/lyrics/placeholderartist/placeholdersong.html",
     );
     expect(lyrics).toMatchObject({

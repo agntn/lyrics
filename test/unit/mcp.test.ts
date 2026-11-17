@@ -1,5 +1,5 @@
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import pkg from "../../package.json" with { type: "json" };
 import { Provider } from "../../src/core/provider.ts";
 import type { ProviderConstructor } from "../../src/core/provider.ts";
