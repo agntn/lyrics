@@ -1,7 +1,7 @@
 {
   "name": "@agntn/lyrics",
   "version": "0.1.1",
-  "description": "Unified song lyrics provider library for AI agents",
+  "description": "Unified song lyrics provider library for humans and agents",
   "keywords": [
     "omp-extension",
     "pi-package"
